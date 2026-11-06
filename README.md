@@ -48,45 +48,107 @@ streamlit run app.py
 
 ## Dataset Setup
 
-CineNexus requires a movie dataset in CSV format. The dataset is not included in this repository, so users must provide their own.
+CineNexus uses the [Letterboxd Movie Dataset](https://www.kaggle.com/datasets/gsimonx37/letterboxd/data) from Kaggle. The dataset is not included in this repository, so users must download and provide the required CSV files themselves.
 
-### 1. Prepare the Dataset
+Only the following six CSV files from the original dataset are used:
 
-Create a `data` directory in the project's root directory and place your movie dataset inside it using the following filename:
+- `movies.csv`
+- `actors.csv`
+- `crew.csv`
+- `genres.csv`
+- `studios.csv`
+- `themes.csv`
+
+### 1. Download and Prepare the Dataset
+
+Download the dataset from [Kaggle - Letterboxd Movie Dataset](https://www.kaggle.com/datasets/gsimonx37/letterboxd/data).
+
+Create a `data` directory in the project's root directory and place the six CSV files inside it. The directory structure should look like this:
 
 ```text
 CineNexus/
-└── data/
-    └── movies.csv
+├── data/
+│   ├── movies.csv
+│   ├── actors.csv
+│   ├── crew.csv
+│   ├── genres.csv
+│   ├── studios.csv
+│   └── themes.csv
+├── app.py
+└── ...
 ```
 
 ### 2. Required CSV Fields
 
-The CSV file must contain the following columns:
+Each CSV file must contain the following columns:
+
+**`movies.csv`**
 
 | Column | Description |
 |---|---|
 | `id` | Unique identifier for each movie |
-| `title` | Movie title |
-| `year` | Movie release year |
-| `overview` | Movie plot description or overview |
-| `genres` | Movie genres |
-| `director` | Movie director |
-| `actors` | Movie cast members |
+| `name` | Movie title |
+| `date` | Movie release date |
+| `tagline` | Movie tagline |
+| `description` | Movie plot description or overview |
+| `minute` | Movie duration in minutes |
+| `rating` | Movie rating |
+
+**`actors.csv`**
+
+| Column | Description |
+|---|---|
+| `id` | Movie identifier |
+| `name` | Actor's name |
+| `role` | Character or role associated with the actor |
+
+**`crew.csv`**
+
+| Column | Description |
+|---|---|
+| `id` | Movie identifier |
+| `role` | Crew member's production role |
+| `name` | Crew member's name |
+
+**`genres.csv`**
+
+| Column | Description |
+|---|---|
+| `id` | Movie identifier |
+| `genre` | Movie genre |
+
+**`studios.csv`**
+
+| Column | Description |
+|---|---|
+| `id` | Movie identifier |
+| `studio` | Production studio |
+
+**`themes.csv`**
+
+| Column | Description |
+|---|---|
+| `id` | Movie identifier |
+| `theme` | Movie theme |
 
 **Important:**
+
 - Column names must match the required names exactly.
-- The `genres` and `actors` fields must use the pipe character (`|`) to separate multiple entries.
+- The `id` column is used to associate actors, crew members, genres, studios, and themes with their corresponding movies.
+- The `id` values must be consistent across all six CSV files.
+- The application filters `crew.csv` to obtain directors using the `director` role.
+- Multiple actors, genres, studios, and themes associated with a movie are grouped together during dataset processing.
 - Missing values are handled by the application.
-- Each movie should have a unique ID.
 
-Example:
+### 3. Dataset Processing and Embedding Generation
 
-```csv
-id,title,year,overview,genres,director,actors
-1,Example Movie,2020,A story about an unexpected adventure,Adventure|Drama,John Smith,Jane Doe|Richard Roe
-2,Another Movie,2022,A detective investigates a mysterious disappearance,Crime|Mystery,Alex Johnson,Michael Brown|Sarah White
-```
+When CineNexus loads the dataset, it uses the `id` column to associate records from the five related CSV files with their corresponding entries in `movies.csv`. This allows the application to construct complete movie records without duplicating movies when multiple related entries exist.
+
+For semantic search and movie recommendations, CineNexus combines each movie's title, tagline, and description into a single text representation. Sentence-BERT then generates a 384-dimensional embedding for each movie.
+
+On the first run, embedding generation may take some time depending on the size of the dataset and available hardware. The generated embeddings are saved locally in the `data` directory and reused on subsequent runs when the dataset and model remain unchanged.
+
+The original dataset and generated embedding files are excluded from Git tracking. Users must provide their own dataset when setting up the project.
 
 ### 3. Embedding Generation
 
@@ -109,6 +171,16 @@ CineNexus currently uses the pretrained model for embedding generation. It does 
 CineNexus currently focuses on semantic search, plot-based movie recommendations, and graph-based exploration of movie relationships.
 
 Recommendations are primarily based on plot-description similarity. Although genres, directors, and actors are represented in the knowledge graph, they are not currently incorporated into the recommendation scoring process.
+
+## References
+
+Devlin, J., Chang, M.-W., Lee, K., & Toutanova, K. (2019). BERT: Pre-training of deep bidirectional transformers for language understanding. *Proceedings of the 2019 Conference of the North American Chapter of the Association for Computational Linguistics: Human Language Technologies*, 4171–4186. https://doi.org/10.18653/v1/N19-1423
+
+Patil, S., Bijapur, R. R., Bidargaddi, A. P., Kothari, S. D., & Dabade, S. H. (2024). Enhancing movie recommendation systems with BERT: A deep learning approach. *2024 5th International Conference for Emerging Technology (INCET)*, 1–8. https://doi.org/10.1109/INCET61516.2024.10593284
+
+Reimers, N., & Gurevych, I. (2019). Sentence-BERT: Sentence embeddings using Siamese BERT-networks. *Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing and the 9th International Joint Conference on Natural Language Processing (EMNLP-IJCNLP)*, 3982–3992. https://doi.org/10.18653/v1/D19-1410
+
+Simon, G. (n.d.). *Letterboxd movie dataset* [Data set]. Kaggle. https://www.kaggle.com/datasets/gsimonx37/letterboxd/data
 
 ## Members
 
