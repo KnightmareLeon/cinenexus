@@ -1,7 +1,10 @@
+
 import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
 
+from presentation.search_page import (build_movie_index,find_movies_by_title)
+from services.graph_service import build_graph
 
 def make_graph_figure(graph, focus_movie_id, max_nodes=65):
     focus = f"movie:{focus_movie_id}"
@@ -16,7 +19,9 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
         if graph.nodes[neighbor].get("kind") != "Movie":
             visible.update(n for n in graph.neighbors(neighbor) if graph.nodes[n].get("kind") == "Movie")
 
-    visible = set(list(visible)[:max_nodes])
+    visible.discard(focus)
+    visible = {focus, *list(visible)[:max_nodes - 1]}
+
     subgraph = graph.subgraph(visible).copy()
 
     if not subgraph.nodes:
@@ -33,21 +38,9 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
         edge_x += [x0, x1, None]
         edge_y += [y0, y1, None]
 
-    edge_trace = go.Scatter(
-        x=edge_x,
-        y=edge_y,
-        mode="lines",
-        line=dict(width=1, color="#a8a8a8"),
-        hoverinfo="none",
-        showlegend=False
-    )
+    edge_trace = go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(width=1, color="#a8a8a8"), hoverinfo="none", showlegend=False)
 
-    color_map = {
-        "Movie": "#4776b4",
-        "Actor": "#35a16b",
-        "Director": "#d98b32",
-        "Genre": "#9467bd",
-    }
+    color_map = {"Movie": "#4776b4", "Actor": "#35a16b", "Director": "#d98b32", "Genre": "#9467bd",}
 
     node_x, node_y = [], []
     node_text, node_colors, node_sizes = [], [], []
@@ -63,10 +56,7 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
 
         node_text.append(f"{label}<br>Type: {kind}")
 
-        node_colors.append(
-            "#e24a4a" if node == focus
-            else color_map.get(kind, "#777777")
-        )
+        node_colors.append("#e24a4a" if node == focus else color_map.get(kind, "#777777"))
 
         node_sizes.append(25 if node == focus else (17 if kind == "Movie" else 12))
 
@@ -96,25 +86,38 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
 
     return fig
 
-
-def render_graph_page(movies, graph):
+@st.fragment
+def render_graph_page(movies, relationship_index):
     st.subheader("Explore movie connections")
 
+    _, title_index = build_movie_index(movies)
+
+    title_query = title_query = st.text_input("Find a movie by title", placeholder="Start typing a movie title...", key="graph_movie_search")
+
+    matching_ids = find_movies_by_title(title_index, title_query, limit=20)
+
+    if not matching_ids:
+        if title_query.strip():
+            st.info("No matching movie titles found.")
+        else:
+            st.info("Enter a movie title to explore its connections.")
+        return
+
+    movie_by_id = {movie.id: movie for movie in movies}
+
     selected_id = st.selectbox(
-        "Select a movie",
-        options=[movie.id for movie in movies],
-        format_func=lambda movie_id: next(
-            movie.title
-            for movie in movies
-            if movie.id == movie_id
+        "Matching movies",
+        options=matching_ids,
+        format_func=lambda movie_id: (
+            f"{movie_by_id[movie_id].title} "
+            f"({movie_by_id[movie_id].year})"
         ),
-        key="graph_movie_selector"
+        key=f"graph_movie_{title_query.casefold()}"
     )
 
     if selected_id:
-        fig = make_graph_figure(
-            graph,
-            focus_movie_id=selected_id
-        )
+        graph = build_graph(movies, focus_movie_id=selected_id, relationship_index=relationship_index)
+
+        fig = make_graph_figure(graph, focus_movie_id=selected_id)
 
         st.plotly_chart(fig, width="stretch")
