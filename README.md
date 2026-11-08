@@ -50,7 +50,9 @@ streamlit run app.py
 
 CineNexus uses the [Letterboxd Movie Dataset](https://www.kaggle.com/datasets/gsimonx37/letterboxd/data) from Kaggle. The dataset is not included in this repository, so users must download and provide the required CSV files themselves.
 
-Only the following six CSV files from the original dataset are used:
+CineNexus uses SQLite for persistent movie data storage. Before running the application for the first time, users must prepare the CSV files, create the database, and import the dataset.
+
+Only the following six CSV files from the original dataset are required:
 
 - `movies.csv`
 - `actors.csv`
@@ -61,9 +63,11 @@ Only the following six CSV files from the original dataset are used:
 
 ### 1. Download and Prepare the Dataset
 
-Download the dataset from [Kaggle - Letterboxd Movie Dataset](https://www.kaggle.com/datasets/gsimonx37/letterboxd/data).
+Download the dataset from [Kaggle – Letterboxd Movie Dataset](https://www.kaggle.com/datasets/gsimonx37/letterboxd/data).
 
-Create a `data` directory in the project's root directory and place the six CSV files inside it. The directory structure should look like this:
+Create a `data` directory in the project's root directory and place the six CSV files inside it.
+
+The directory structure should look like this:
 
 ```text
 CineNexus/
@@ -134,27 +138,99 @@ Each CSV file must contain the following columns:
 **Important:**
 
 - Column names must match the required names exactly.
-- The `id` column is used to associate actors, crew members, genres, studios, and themes with their corresponding movies.
+- The `id` column associates actors, crew members, genres, studios, and themes with their corresponding movies.
 - The `id` values must be consistent across all six CSV files.
 - The application filters `crew.csv` to obtain directors using the `director` role.
 - Multiple actors, genres, studios, and themes associated with a movie are grouped together during dataset processing.
 - Missing values are handled by the application.
 
-### 3. Dataset Processing and Embedding Generation
+### 3. Create the SQLite Database
 
-When CineNexus loads the dataset, it uses the `id` column to associate records from the five related CSV files with their corresponding entries in `movies.csv`. This allows the application to construct complete movie records without duplicating movies when multiple related entries exist.
+After preparing the CSV files, create the SQLite database.
 
-For semantic search and movie recommendations, CineNexus combines each movie's title, tagline, and description into a single text representation. Sentence-BERT then generates a 384-dimensional embedding for each movie.
+From the project's root directory, run:
 
-On the first run, embedding generation may take some time depending on the size of the dataset and available hardware. The generated embeddings are saved locally in the `data` directory and reused on subsequent runs when the dataset and model remain unchanged.
+```powershell
+python -m scripts.create_database
+```
 
-The original dataset and generated embedding files are excluded from Git tracking. Users must provide their own dataset when setting up the project.
+This initializes the SQLite database and creates the required tables for storing movie information, relationships, and embedding metadata.
 
-### 3. Embedding Generation
+The generated database is stored at:
 
-On the first run, CineNexus generates sentence embeddings for the movie descriptions using Sentence-BERT. The generated embeddings are saved locally in the `data` directory and reused on subsequent runs when the dataset and model remain unchanged.
+```text
+data/cinenexus.db
+```
 
-The dataset and generated embedding files are excluded from Git tracking. Users must provide their own dataset when setting up the project.
+### 4. Import the Dataset
+
+Once the database has been created, import the CSV files:
+
+```powershell
+python -m scripts.import_dataset
+```
+
+The importer processes the six CSV files and transfers the resulting records into the SQLite database.
+
+During this process, CineNexus:
+
+1. Reads the six CSV files.
+2. Associates related records using their movie IDs.
+3. Extracts directors from the crew data.
+4. Groups related actors, genres, studios, and themes by movie.
+5. Constructs searchable text representations using each movie's title, tagline, and description.
+6. Generates a dataset fingerprint and stores the corresponding embedding metadata in the database.
+
+The resulting SQLite database contains the processed movie records and their associated relationships.
+
+### 5. Embedding Generation and Caching
+
+CineNexus uses the pretrained Sentence-BERT model `sentence-transformers/all-MiniLM-L6-v2` to generate 384-dimensional embeddings for movie search and recommendations.
+
+After importing the dataset, run the application:
+
+```powershell
+streamlit run app.py
+```
+
+During application initialization, CineNexus checks whether valid precomputed embeddings are available.
+
+If embeddings do not exist or do not match the current dataset fingerprint, the application generates new embeddings from the searchable movie text and saves them locally.
+
+The generated embeddings are stored in:
+
+```text
+data/embeddings.npz
+```
+
+On subsequent runs, the application reuses the stored embeddings when their dataset fingerprint and model configuration remain valid. This avoids unnecessary embedding generation and model inference.
+
+CineNexus also uses Streamlit caching to avoid repeating frequently requested database queries, recommendation calculations, and graph construction.
+
+### 6. Generated Data Files
+
+After completing the database setup and running the application for the first time, the `data` directory should contain:
+
+```text
+data/
+├── movies.csv
+├── actors.csv
+├── crew.csv
+├── genres.csv
+├── studios.csv
+├── themes.csv
+├── cinenexus.db
+└── embeddings.npz
+```
+
+The original CSV files are retained as the source dataset. The SQLite database stores the processed movie records, while the NumPy file stores the precomputed embeddings.
+
+**Important:**
+
+- The CSV files, SQLite database, and generated embeddings are excluded from Git tracking.
+- Users must download the required CSV files and perform the database setup themselves.
+- The database and embeddings should be regenerated when importing a different dataset.
+- The application retrieves movie information from SQLite during normal operation instead of processing the original CSV files on every startup.
 
 ## Machine Learning Model
 
