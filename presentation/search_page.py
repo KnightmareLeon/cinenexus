@@ -1,10 +1,12 @@
 
 import streamlit as st
 
+from services.movie_service import MovieService
 from services.recommendation_service import (search_movies, get_similar_movies,)
+from services.query_cache import (get_cached_semantic_search, get_cached_title_search, get_cached_similar_movies)
 
 @st.fragment
-def render_semantic_search(movie_service, embeddings, model, top_k):
+def render_semantic_search(movie_service: MovieService, embeddings, model, top_k: int, dataset_fingerprint: str):
     st.subheader("Find a movie")
 
     with st.form("semantic_search_form"):
@@ -14,7 +16,7 @@ def render_semantic_search(movie_service, embeddings, model, top_k):
 
     if submitted:
         if query.strip():
-            results = search_movies(query, movie_service, embeddings, model, top_k)
+            results = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
 
             st.markdown("**Best semantic matches**")
 
@@ -39,13 +41,12 @@ def render_semantic_search(movie_service, embeddings, model, top_k):
 
 
 @st.fragment
-def render_catalog_browser(movie_service, embeddings, top_k):
+def render_catalog_browser(movie_service: MovieService, embeddings, top_k: int, dataset_fingerprint: str):
     st.subheader("Browse the catalog")
 
     title_query = st.text_input("Find a movie by title", placeholder="Start typing a movie title...", key="search_movie_search")
 
-    matching_movies = movie_service.search_movies_by_title(title_query, limit=20)
-
+    matching_movies = get_cached_title_search(movie_service, title_query.strip(), 20, dataset_fingerprint)
     selected = None
 
     if matching_movies:
@@ -88,7 +89,7 @@ def render_catalog_browser(movie_service, embeddings, top_k):
             f"{', '.join(selected.actors) or 'Unknown'}"
         )
 
-        results = get_similar_movies(selected.id, movie_service, embeddings, top_k)
+        results = get_cached_similar_movies(selected.id, top_k, dataset_fingerprint, movie_service, embeddings)
 
         st.markdown("**Movies with similar descriptions**")
 
@@ -102,11 +103,11 @@ def render_catalog_browser(movie_service, embeddings, top_k):
                 )
 
 
-def render_search_page(movie_service, embeddings, model, top_k):
+def render_search_page(movie_service, embeddings, model, top_k: int, dataset_fingerprint: str):
     left, right = st.columns([1, 1.4], gap="large")
 
     with left:
-        render_semantic_search(movie_service, embeddings, model, top_k)
+        render_semantic_search(movie_service, embeddings, model, top_k, dataset_fingerprint)
 
     with right:
-        render_catalog_browser(movie_service, embeddings, top_k)
+        render_catalog_browser(movie_service, embeddings, top_k, dataset_fingerprint)
