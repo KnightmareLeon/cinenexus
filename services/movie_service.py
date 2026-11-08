@@ -1,26 +1,34 @@
-from domain.movie import Movie
 
-def get_movie_by_id(movies: list[Movie], movie_id: str):
+class MovieService:
+    def __init__(self, movie_repository):
+        self.movie_repository = movie_repository
 
-    return next((movie for movie in movies if movie.id == str(movie_id)), None)
+    def get_movie_count(self):
+        return self.movie_repository.count_movies()
 
+    def get_movies_page(self, page=1, page_size=50):
+        return self.movie_repository.get_movies_page(page=page, page_size=page_size)
 
-def get_movie_by_title(movies: list[Movie], title: str):
-    return next((movie for movie in movies if movie.title == title), None)
+    def get_movie_by_id(self, movie_id):
+        return self.movie_repository.get_movie_by_id(movie_id)
 
-def split_entities(value):
-    return tuple(item.strip() for item in str(value).split("|") if item.strip())
+    def search_movies_by_title(self, query, limit=20):
+        return self.movie_repository.search_by_title(query=query, limit=limit)
 
-def movie_from_row(row):
+    def get_movies_by_ids(self, movie_ids):
+        return self.movie_repository.get_movies_by_ids(movie_ids)
 
-    director = str(row["director"]).strip()
+    def get_related_movies(self, movie_id, limit=5):
+        return self.movie_repository.get_related_movies(movie_id=movie_id, limit=limit)
 
-    return Movie(
-        id=str(row["id"]),
-        title=str(row["title"]),
-        year=str(row["year"]),
-        overview=str(row["overview"]),
-        genres=split_entities(row["genres"]),
-        director=director or None,
-        actors=split_entities(row["actors"])
-    )
+    def get_movie_embedding_index(self, movie_id):
+        return self.movie_repository.get_movie_embedding_index(movie_id)
+
+    def get_movie_ids_by_embedding_indices(self, embedding_indices):
+        return self.movie_repository.get_movie_ids_by_embedding_indices(embedding_indices)
+
+    def get_embedding_metadata(self):
+        return self.movie_repository.get_embedding_metadata()
+
+    def get_search_texts(self):
+        return self.movie_repository.get_search_texts()

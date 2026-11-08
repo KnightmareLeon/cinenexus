@@ -1,27 +1,36 @@
-from domain.movie import Movie
 from domain.recommendation import MovieMatch
 
 from ml.embeddings import encode_query
-from ml.similarity import (cosine_similarity_scores, rank_indices)
+from ml.similarity import cosine_similarity_scores, rank_indices
 
-
-def search_movies(query: str, movies: list[Movie], embeddings, model, top_k: int = 5) -> list[MovieMatch]:
+def search_movies(query, movie_service, embeddings, model, top_k=5):
     query_embedding = encode_query(query, model)
 
     scores = cosine_similarity_scores(query_embedding, embeddings)
 
     ranked_indices = rank_indices(scores, top_k)
 
-    return [MovieMatch(movie=movies[index], similarity=float(scores[index])) for index in ranked_indices]
+    movie_ids = movie_service.get_movie_ids_by_embedding_indices(ranked_indices.tolist())
 
-def get_similar_movies(movie_id: str, movies: list[Movie], embeddings, top_k: int = 5) -> list[MovieMatch]:
-    selected_idx = next((index for index, movie in enumerate(movies) if movie.id == str(movie_id)), None)
+    movies = movie_service.get_movies_by_ids(movie_ids)
 
-    if selected_idx is None:
+    return [MovieMatch(movie=movie, similarity=float(scores[index])) for movie, index in zip(movies, ranked_indices)]
+
+def get_similar_movies(movie_id, movie_service, embeddings,top_k=5):
+    selected_index = movie_service.get_movie_embedding_index(movie_id)
+
+    if selected_index is None:
         return []
 
-    scores = cosine_similarity_scores([embeddings[selected_idx]], embeddings)
+    if selected_index < 0 or selected_index >= len(embeddings):
+        return []
 
-    ranked_indices = rank_indices(scores, top_k, exclude_index=selected_idx)
+    scores = cosine_similarity_scores(embeddings[selected_index], embeddings)
 
-    return [MovieMatch(movie=movies[index], similarity=float(scores[index]))for index in ranked_indices]
+    ranked_indices = rank_indices(scores, top_k, exclude_index=selected_index)
+
+    movie_ids = movie_service.get_movie_ids_by_embedding_indices(ranked_indices.tolist())
+
+    movies = movie_service.get_movies_by_ids(movie_ids)
+
+    return [MovieMatch(movie=movie, similarity=float(scores[index])) for movie, index in zip(movies, ranked_indices)]

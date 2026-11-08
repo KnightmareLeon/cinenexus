@@ -14,3 +14,26 @@ def get_movie_embeddings(texts, model, model_name, repository: EmbeddingReposito
     repository.save(embeddings, fingerprint)
 
     return embeddings
+
+def get_movie_embeddings_from_database(movie_service, model, model_name, repository: EmbeddingRepository, expected_fingerprint,):
+
+    embeddings = repository.load(expected_fingerprint)
+
+    if embeddings is not None:
+        return embeddings
+
+    texts = movie_service.get_search_texts()
+
+    actual_fingerprint = repository.create_fingerprint(texts, model_name)
+
+    if actual_fingerprint != expected_fingerprint:
+        raise ValueError(
+            "The database embedding fingerprint does not match "
+            "the current movie dataset. Please re-import the dataset."
+        )
+
+    embeddings = encode_texts(texts, model)
+
+    repository.save(embeddings, actual_fingerprint)
+
+    return embeddings
