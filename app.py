@@ -69,6 +69,8 @@ try:
             "Please re-import the dataset."
         )
 
+    dataset_fingerprint = embedding_metadata["fingerprint"]
+
 except Exception as exc:
     st.error(f"Could not initialize CineNexus: {exc}")
     st.stop()
@@ -102,10 +104,10 @@ with st.sidebar:
 tab_search, tab_graph, tab_dataset = st.tabs(["🔎 Movie Search", "🕸️ Knowledge Graph", "📚 Dataset"])
 
 with tab_search:
-    render_search_page(movie_service, embeddings, model, top_k)
+    render_search_page(movie_service, embeddings, model, top_k, dataset_fingerprint)
 
 with tab_graph:
-    render_graph_page(movie_service)
+    render_graph_page(movie_service, dataset_fingerprint)
 
 with tab_dataset:
-    render_dataset_page(movie_service)
+    render_dataset_page(movie_service, dataset_fingerprint)

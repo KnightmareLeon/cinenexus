@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from services.movie_service import MovieService
+from services.query_cache import get_cached_movies_page
 
 def previous_page():
     st.session_state.dataset_page_number -= 1
@@ -14,7 +15,7 @@ def next_page():
     st.session_state.dataset_page_input = st.session_state.dataset_page_number
 
 @st.fragment
-def render_dataset_page(movie_service: MovieService):
+def render_dataset_page(movie_service: MovieService, dataset_fingerprint: str):
     st.subheader("Movie Dataset")
 
     total_records = movie_service.get_movie_count()
@@ -36,7 +37,7 @@ def render_dataset_page(movie_service: MovieService):
 
     st.session_state.dataset_page_number = current_page
 
-    movies = movie_service.get_movies_page(page=current_page, page_size=page_size)
+    movies = get_cached_movies_page(movie_service, current_page, page_size, dataset_fingerprint)
 
     start = (current_page - 1) * page_size
     end = start + len(movies)

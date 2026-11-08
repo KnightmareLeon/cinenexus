@@ -3,7 +3,12 @@ import streamlit as st
 import networkx as nx
 import plotly.graph_objects as go
 
-from services.graph_service import build_graph
+from services.movie_service import MovieService
+from services.query_cache import (get_cached_title_search, get_cached_movie_graph)
+
+@st.cache_data(show_spinner=False)
+def get_cached_graph_figure(_graph, focus_movie_id: str, dataset_fingerprint: str):
+    return make_graph_figure(_graph, focus_movie_id=focus_movie_id)
 
 def make_graph_figure(graph, focus_movie_id, max_nodes=65):
     focus = f"movie:{focus_movie_id}"
@@ -88,12 +93,12 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
     return fig
 
 @st.fragment
-def render_graph_page(movie_service):
+def render_graph_page(movie_service: MovieService, dataset_fingerprint: str):
     st.subheader("Explore movie connections")
 
     title_query = st.text_input("Find a movie by title", placeholder="Start typing a movie title...", key="graph_movie_search")
 
-    matching_movies = movie_service.search_movies_by_title(title_query, limit=20)
+    matching_movies = get_cached_title_search(movie_service, title_query, 20, dataset_fingerprint)
 
     if not matching_movies:
         if title_query.strip():
@@ -115,8 +120,8 @@ def render_graph_page(movie_service):
     )
 
     if selected_id:
-        graph = build_graph(focus_movie_id=selected_id, movie_service=movie_service)
+        graph = get_cached_movie_graph(movie_service, selected_id, dataset_fingerprint)
 
-        fig = make_graph_figure(graph, focus_movie_id=selected_id)
+        fig = get_cached_graph_figure(graph, selected_id, dataset_fingerprint)
 
         st.plotly_chart(fig, width="stretch")
