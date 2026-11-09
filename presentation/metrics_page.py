@@ -119,5 +119,11 @@ def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerp
         st.write(f"Each query has one target. When exactly {top_k} movies are returned, even a successful lookup has F1 = {2 / (top_k + 1):.1%}, because the other results are not that target.")
         st.write("Times measure one uncached search per query, including query encoding, ranking, and movie retrieval. Model loading and TF-IDF index building are excluded. They are not repeated timing trials.")
     report = {**run, "summary": summary.reset_index().to_dict(orient="records")}
+    st.download_button(
+        "Download per-query metrics (CSV)",
+        scores.to_csv(index=False).encode("utf-8-sig"),
+        file_name=f"search-test-metrics-k{top_k}.csv",
+        mime="text/csv",
+    )
     st.download_button("Download test metrics (JSON)", json.dumps(report, indent=2),
                        file_name="search-test-metrics.json", mime="application/json")
