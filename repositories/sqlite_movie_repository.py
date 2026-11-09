@@ -315,3 +315,9 @@ class SQLiteMovieRepository(RDBMSMovieRepository):
 
         return [row["search_text"] for row in rows]
 
+    def iter_search_texts(self):
+        """Stream the corpus so TF-IDF fitting does not copy all descriptions."""
+        with closing(self._connect()) as connection:
+            cursor = connection.execute("SELECT search_text FROM movies ORDER BY embedding_index")
+            for row in cursor:
+                yield row["search_text"]

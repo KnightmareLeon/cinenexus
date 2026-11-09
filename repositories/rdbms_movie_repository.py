@@ -41,3 +41,7 @@ class RDBMSMovieRepository(ABC):
     @abstractmethod
     def get_search_texts(self) -> list[str]:
         pass
+
+    @abstractmethod
+    def iter_search_texts(self):
+        pass

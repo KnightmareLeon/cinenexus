@@ -32,3 +32,6 @@ class MovieService:
 
     def get_search_texts(self):
         return self.movie_repository.get_search_texts()
+
+    def iter_search_texts(self):
+        return self.movie_repository.iter_search_texts()

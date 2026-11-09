@@ -1,11 +1,13 @@
 # CineNexus
 
-**CineNexus** is a transformer-powered movie explorer that uses Sentence-BERT (SBERT) to discover movies with semantically similar descriptions. It combines natural-language movie search, content-based recommendations, and a knowledge graph to help users explore relationships between movies, genres, directors, and actors.
+**CineNexus** is a transformer-powered movie explorer that uses Sentence-BERT (SBERT) to discover movies with semantically similar descriptions. It also includes a TF-IDF keyword-search baseline for comparing search results with SBERT. It combines natural-language movie search, content-based recommendations, and a knowledge graph to help users explore relationships between movies, genres, directors, and actors.
 
 This web application was made to fulfill the partial requirements for the course **CSC173 - Intelligent Systems** in the program *Bachelor of Science in Computer Science* of **Mindanao State University - Iligan Institute of Technology**.
 ## Features
 
 - **Semantic Movie Search** – Search for movies using a title, phrase, or natural-language description. CineNexus uses Sentence-BERT to find movies with semantically relevant plot descriptions.
+- **TF-IDF Baseline** – Use the same search box to select SBERT, TF-IDF, or compare both side by side. TF-IDF uses the same movie search text, English stop-word removal, up to 100,000 unigram features, and normalized sparse vectors with cosine similarity. It returns only positive matches and builds its index on first use, cached in memory until the app restarts or the dataset changes.
+- **Search Metrics** – Run ten preset test queries, using ten unique movie titles, including Inception, Interstellar, and The Shawshank Redemption, against both methods. Compare top-1 accuracy, precision, recall, F1, and search time per query and on average, then download the report as JSON. Expected movie targets are saved in advance; no manual labeling is needed.
 - **Similar Movie Recommendations** – Select a movie to discover other movies with similar descriptions, ranked by cosine similarity.
 - **Movie Knowledge Graph** – Explore connections between movies and their genres, directors, and actors through an interactive graph.
 - **Dataset Explorer** – Browse the loaded movie catalog and download the current dataset as a CSV file.
@@ -19,6 +21,7 @@ This web application was made to fulfill the partial requirements for the course
 | Streamlit | Web application and user interface |
 | Sentence-Transformers | Generating semantic sentence embeddings |
 | all-MiniLM-L6-v2 | Pretrained Sentence-BERT model |
+| scikit-learn | TF-IDF vectorization for keyword-based movie search |
 | NumPy | Embedding storage and similarity calculations |
 | Pandas | Movie dataset loading and processing |
 | NetworkX | Knowledge graph construction |
@@ -232,6 +235,37 @@ The original CSV files are retained as the source dataset. The SQLite database s
 - The database and embeddings should be regenerated when importing a different dataset.
 - The application retrieves movie information from SQLite during normal operation instead of processing the original CSV files on every startup.
 
+## Search Methods and Comparison
+
+Both search methods compare your query against the same searchable text: each movie's **title, tagline, and description**. The dataset's `description` field is stored as `overview` during processing.
+
+| Method | How it finds movies | Main limitation |
+|---|---|---|
+| SBERT (Semantic) | Encodes queries and movie text into sentence embeddings, then ranks by cosine similarity. | Semantic similarity does not guarantee that a movie is relevant. |
+| TF-IDF (Baseline) | Weights words by their frequency in a movie's text and rarity across the catalog, then ranks by cosine similarity. | Depends on shared words; it does not understand synonyms or the overall meaning of a description. |
+
+### Searching with a Description
+
+TF-IDF can search using a full description, not just a movie title. For example, `astronaut stranded on Mars` can match movie descriptions containing those words. Rephrasing it as `someone stuck on another planet` may miss the same movies if the indexed text does not share those words. SBERT can recognize similar meanings across different wording, although results still depend on the dataset and model.
+
+The TF-IDF implementation uses scikit-learn's `TfidfVectorizer` with English stop-word removal, up to 100,000 single-word features (unigrams), and L2-normalized sparse vectors. It returns only movies with positive similarity, so it may return fewer than the requested number of results or no results when the query has no matching vocabulary. The index is built on first use and cached in memory; it is rebuilt after an application restart or a dataset change rather than saved to an embedding file.
+
+### Comparing Results
+
+1. Enter a title, keywords, or plot description in **Find a movie**.
+2. Choose **SBERT (Semantic)**, **TF-IDF (Baseline)**, or **Compare both** under **Search method**.
+3. Click **Search**. **Compare both** displays the two ranked result lists side by side, with descriptions and similarity scores.
+
+Similarity scores are ranking signals, not accuracy percentages. A higher score from one method does not by itself mean that method gives better results.
+
+To compare the methods, open **Search Metrics** and click **Run test queries**. The page runs ten exact-title queries: Inception, Interstellar, The Shawshank Redemption, Eternal Sunshine of the Spotless Mind, Everything Everywhere All at Once, The Grand Budapest Hotel, The Truman Show, Spirited Away, The Silence of the Lambs, and The Curious Case of Benjamin Button. Each title was verified to occur exactly once in the bundled catalog, ignoring case and across all release years. These cases were selected by title uniqueness, not by their search scores. Each has one saved target movie, identified by catalog ID, title, and year. The table shows per-query scores and unweighted averages across completed queries; missing or changed targets are explicitly skipped. **Download test metrics (JSON)** exports the targets, rankings, metrics, summary, skipped tests, and dataset fingerprint.
+
+- **Accuracy@1**: 100% when the expected movie is the first result, otherwise 0%. The average is the fraction of queries answered correctly at rank 1. The per-query table’s **Expected film status** names the expected film and director within the found/not-found message. **Predicted film (rank 1)** shows the actual first result beside it; **Inspect returned movies** shows the ranked titles and IDs so same-title records can be distinguished.
+- **Precision@k / Recall@k / F1@k**: compare the returned movie IDs against the saved target. Empty results score zero. Precision uses the number actually returned. With one target and five returned movies, a successful lookup has precision 20%, recall 100%, and F1 33.3%.
+- **Time (ms)**: one uncached search per query per method, excluding model loading, TF-IDF index building, and scoring; the summary averages those query times, not repeated timing trials.
+
+These are fixed known-movie lookup tests, not general semantic relevance or recommendation accuracy. Using unique exact titles removes same-title ambiguity; it does not guarantee that either search method ranks the expected movie first. Similar titles, sequels, and other records can still rank above the target. “Not in top k” describes the expected film. Other movies count as incorrect for this specific lookup task. Both methods search the full catalog using the sidebar result count. Changing the preset cases, dataset, or result count requires rerunning the tests. Recheck title uniqueness when replacing or updating the catalog. To maintain the saved cases, edit `TEST_QUERIES` in `services/evaluation_service.py`.
+
 ## Machine Learning Model
 
 CineNexus uses the pretrained model:
@@ -244,7 +278,7 @@ CineNexus currently uses the pretrained model for embedding generation. It does 
 
 ## Current Scope
 
-CineNexus currently focuses on semantic search, plot-based movie recommendations, and graph-based exploration of movie relationships.
+CineNexus currently focuses on semantic search, TF-IDF keyword search, comparison and preset query evaluation of both search methods, plot-based movie recommendations, and graph-based exploration of movie relationships.
 
 Recommendations are primarily based on plot-description similarity. Although genres, directors, and actors are represented in the knowledge graph, they are not currently incorporated into the recommendation scoring process.
 

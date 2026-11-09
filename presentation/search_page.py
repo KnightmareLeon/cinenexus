@@ -2,8 +2,18 @@
 import streamlit as st
 
 from services.movie_service import MovieService
-from services.recommendation_service import (search_movies, get_similar_movies,)
-from services.query_cache import (get_cached_semantic_search, get_cached_title_search, get_cached_similar_movies)
+from services.query_cache import (get_cached_semantic_search, get_cached_title_search, get_cached_similar_movies, get_cached_tfidf_search)
+
+
+def render_matches(results):
+    if not results:
+        st.info("No matching movies found. Try different words for TF-IDF.")
+    for rank, match in enumerate(results, 1):
+        movie = match.movie
+        st.markdown(f"**{rank}. {movie.title} ({movie.year})** · similarity `{match.similarity:.3f}`")
+        st.caption(f"Director: {getattr(movie, 'director', None) or 'Unknown'}")
+        st.caption(movie.overview or "No description available.")
+        st.divider()
 
 @st.fragment
 def render_semantic_search(movie_service: MovieService, embeddings, model, top_k: int, dataset_fingerprint: str):
@@ -11,31 +21,35 @@ def render_semantic_search(movie_service: MovieService, embeddings, model, top_k
 
     with st.form("semantic_search_form"):
         query = st.text_input("Search by title or describe what you want to watch", placeholder="e.g., a space adventure about family")
+        method = st.radio("Search method", ["SBERT (Semantic)", "TF-IDF (Baseline)", "Compare both"], horizontal=True)
 
         submitted = st.form_submit_button("Search")
 
     if submitted:
         if query.strip():
-            results = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
-
-            st.markdown("**Best semantic matches**")
-
-            if not results:
-                st.info("No matching movies found.")
+            results = {}
+            try:
+                with st.spinner("Searching movies…"):
+                    if method != "TF-IDF (Baseline)":
+                        results["SBERT"] = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
+                    if method != "SBERT (Semantic)":
+                        results["TF-IDF"] = get_cached_tfidf_search(query.strip(), top_k, dataset_fingerprint, movie_service)
+            except ValueError as exc:
+                st.error(f"Could not run search: {exc}")
                 return
-
-            for match in results:
-                movie = match.movie
-
-                st.markdown(
-                    f"**{movie.title} ({movie.year})** "
-                    f"· similarity `{match.similarity:.3f}`"
-                )
-
-                st.caption(movie.overview)
-                st.divider()
+            st.session_state.movie_search_result = (dataset_fingerprint, top_k, query.strip(), results)
         else:
             st.info("Please enter a search query.")
+            return
+
+    saved = st.session_state.get("movie_search_result")
+    if saved and saved[:2] == (dataset_fingerprint, top_k):
+        st.caption(f'Results for “{saved[2]}” · up to {top_k} per method. Similarity is not an accuracy score.')
+        columns = st.columns(len(saved[3]))
+        for column, (name, matches) in zip(columns, saved[3].items()):
+            with column:
+                st.markdown(f"**{name} matches**")
+                render_matches(matches)
     else:
         st.info("Enter a title or a plot idea, then click Search.")
 
@@ -104,10 +118,6 @@ def render_catalog_browser(movie_service: MovieService, embeddings, top_k: int, 
 
 
 def render_search_page(movie_service, embeddings, model, top_k: int, dataset_fingerprint: str):
-    left, right = st.columns([1, 1.4], gap="large")
-
-    with left:
-        render_semantic_search(movie_service, embeddings, model, top_k, dataset_fingerprint)
-
-    with right:
+    render_semantic_search(movie_service, embeddings, model, top_k, dataset_fingerprint)
+    with st.expander("Browse the catalog and find similar movies"):
         render_catalog_browser(movie_service, embeddings, top_k, dataset_fingerprint)

@@ -3,6 +3,14 @@ from domain.recommendation import MovieMatch
 from ml.embeddings import encode_query
 from ml.similarity import cosine_similarity_scores, rank_indices
 
+
+def search_movies_tfidf(query, movie_service, index, top_k=5):
+    indices, scores = index.search(query, top_k)
+    movie_ids = movie_service.get_movie_ids_by_embedding_indices(indices)
+    movies = movie_service.get_movies_by_ids(movie_ids)
+    scores_by_id = dict(zip(movie_ids, scores))
+    return [MovieMatch(movie=movie, similarity=float(scores_by_id[movie.id])) for movie in movies]
+
 def search_movies(query, movie_service, embeddings, model, top_k=5):
     query_embedding = encode_query(query, model)
 
