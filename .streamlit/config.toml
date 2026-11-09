@@ -1,0 +1,4 @@
+[server]
+# Avoid inotify queue overflows from recursive filesystem watching.
+# Restart Streamlit after changing Python files to load the updated code.
+fileWatcherType = "none"

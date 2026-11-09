@@ -8,6 +8,7 @@ from repositories.embedding_repository import EmbeddingRepository
 from presentation.search_page import render_search_page
 from presentation.graph_page import render_graph_page
 from presentation.dataset_page import render_dataset_page
+from presentation.metrics_page import render_metrics_page
 
 from services.movie_service import MovieService
 from services.embedding_service import get_movie_embeddings_from_database
@@ -101,10 +102,13 @@ with st.sidebar:
     st.write("**Embedding model:** `all-MiniLM-L6-v2`")
     top_k = st.slider("Similar movies to show", min_value=3, max_value=10, value=5)
 
-tab_search, tab_graph, tab_dataset = st.tabs(["🔎 Movie Search", "🕸️ Knowledge Graph", "📚 Dataset"])
+tab_search, tab_metrics, tab_graph, tab_dataset = st.tabs(["🔎 Movie Search", "📊 Search Metrics", "🕸️ Knowledge Graph", "📚 Dataset"])
 
 with tab_search:
     render_search_page(movie_service, embeddings, model, top_k, dataset_fingerprint)
+
+with tab_metrics:
+    render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint)
 
 with tab_graph:
     render_graph_page(movie_service, dataset_fingerprint)
