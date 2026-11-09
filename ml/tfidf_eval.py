@@ -25,7 +25,7 @@ from repositories.embedding_repository import EmbeddingRepository
 from services.movie_service import MovieService
 from ml.model import load_model, MODEL_NAME
 from ml.similarity import cosine_similarity_scores, rank_indices
-from ml.tfidf import build_tfidf_matrix, compute_tfidf_scores
+from ml.tfidf import TfidfIndex
 
 SAMPLE_QUERIES = [
     "space adventure about family",
@@ -96,15 +96,13 @@ def run_baseline_comparison(data_dir):
         model = load_model()  # still needed for query encoding
     print(f"[SBERT] Embeddings ready: {sbert_embeddings.shape} (load time: {sbert_time:.2f}s)")
 
-    # --- TF-IDF matrix ---
-    print("[TF-IDF] Building TF-IDF matrix...")
+    # --- TF-IDF index ---
+    print("[TF-IDF] Building TF-IDF index...")
     t0 = time.time()
-    tfidf_vectorizer, tfidf_matrix = build_tfidf_matrix(
-        search_texts, lowercase=True, strip_accents="unicode", stop_words="english"
-    )
+    tfidf_index = TfidfIndex(search_texts)
     tfidf_build_time = time.time() - t0
     print(
-        f"[TF-IDF] Matrix ready: {tfidf_matrix.shape} in {tfidf_build_time:.2f}s"
+        f"[TF-IDF] Index ready: {tfidf_index.matrix.shape} in {tfidf_build_time:.2f}s"
     )
 
     print("=" * 70)
@@ -134,10 +132,7 @@ def run_baseline_comparison(data_dir):
 
         # --- TF-IDF query ---
         t0 = time.time()
-        tfidf_scores = compute_tfidf_scores(
-            tfidf_vectorizer, tfidf_matrix, [query]
-        )
-        tfidf_indices = rank_indices(tfidf_scores, TOP_K)
+        tfidf_indices, tfidf_scores = tfidf_index.search(query, TOP_K)
         tfidf_query_time = time.time() - t0
         total_tfidf_query_time += tfidf_query_time
 
