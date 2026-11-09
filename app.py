@@ -26,7 +26,7 @@ def get_model():
     return load_model()
 
 
-@st.cache_data
+@st.cache_resource
 def load_embeddings(fingerprint, _movie_service, model_name):
     repository = EmbeddingRepository(EMBEDDINGS_PATH)
 

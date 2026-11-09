@@ -31,7 +31,7 @@ class EmbeddingRepository:
             if fingerprint != expected_fingerprint:
                 return None
 
-            return data["embeddings"].copy()
+            return data["embeddings"]
 
     def save(self, embeddings, fingerprint):
         self.file_path.parent.mkdir(parents=True, exist_ok=True)
