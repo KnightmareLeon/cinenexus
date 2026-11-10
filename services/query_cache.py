@@ -45,6 +45,6 @@ def get_cached_semantic_search(query: str, top_k: int, dataset_fingerprint: str,
 def get_cached_similar_movies(movie_id: str, top_k: int, dataset_fingerprint: str, _movie_service, _embeddings,):
     return get_similar_movies(movie_id, _movie_service, _embeddings, top_k)
 
-@st.cache_data("Building knowledge graph for chosen movie...")
+@st.cache_data(show_spinner="Building knowledge graph for chosen movie...")
 def get_cached_movie_graph(_movie_service: MovieService, movie_id: str, dataset_fingerprint: str,):
     return build_graph(focus_movie_id=movie_id, movie_service=_movie_service)
