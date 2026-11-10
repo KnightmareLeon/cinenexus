@@ -5,11 +5,8 @@ import pandas as pd
 import streamlit as st
 
 from services.evaluation_service import TEST_QUERIES, run_benchmark
-from services.query_cache import get_tfidf_index
-
 
 SCORE_COLUMNS = ["Accuracy@1", "Precision@k", "Recall@k", "F1@k", "Time (ms)"]
-
 
 def _show_scores(frame):
     st.dataframe(frame.style.format({
@@ -36,7 +33,7 @@ def _comparison_frame(scores):
 
 
 @st.fragment
-def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint):
+def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index):
     test_cases = [asdict(case) for case in TEST_QUERIES]
     st.subheader("Search metrics: SBERT vs TF-IDF")
     st.write("Compare both methods on preset test queries with saved target movies. No manual labeling needed.")
@@ -52,9 +49,8 @@ def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerp
         # Clear an earlier run so a failed rerun cannot leave old scores visible.
         st.session_state.pop("metrics_benchmark", None)
         try:
-            index = get_tfidf_index(dataset_fingerprint, movie_service)
             with st.spinner("Testing both search methods…"):
-                report = run_benchmark(top_k, movie_service, embeddings, model, index)
+                report = run_benchmark(top_k, movie_service, embeddings, model, tfidf_index)
         except ValueError as exc:
             st.error(f"Could not run tests: {exc}")
             return
