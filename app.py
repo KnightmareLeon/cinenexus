@@ -3,7 +3,6 @@ import streamlit as st
 from pathlib import Path
 
 from repositories.sqlite_movie_repository import SQLiteMovieRepository
-from repositories.embedding_repository import EmbeddingRepository
 
 from presentation.search_page import render_search_page
 from presentation.graph_page import render_graph_page
@@ -11,26 +10,14 @@ from presentation.dataset_page import render_dataset_page
 from presentation.metrics_page import render_metrics_page
 
 from services.movie_service import MovieService
-from services.embedding_service import get_movie_embeddings_from_database
+from services.query_cache import get_cached_model, load_cached_embeddings, get_tfidf_index
 
-from ml.model import load_model, MODEL_NAME
-
+from ml.model import MODEL_NAME
 BASE_DIR = Path(__file__).parent
 
 DATA_DIR = BASE_DIR / "data"
 DATABASE_PATH = DATA_DIR / "cinenexus.db"
 EMBEDDINGS_PATH = DATA_DIR / "embeddings.npz"
-
-@st.cache_resource
-def get_model():
-    return load_model()
-
-
-@st.cache_resource
-def load_embeddings(fingerprint, _movie_service, model_name):
-    repository = EmbeddingRepository(EMBEDDINGS_PATH)
-
-    return get_movie_embeddings_from_database(movie_service=_movie_service, model=get_model(), model_name=model_name, repository=repository, expected_fingerprint=fingerprint)
 
 try:
     if not DATABASE_PATH.exists():
@@ -77,9 +64,9 @@ except Exception as exc:
     st.stop()
 
 try:
-    model = get_model()
-
-    embeddings = load_embeddings(embedding_metadata["fingerprint"], movie_service, MODEL_NAME)
+    model = get_cached_model()
+    tfidf_index = get_tfidf_index(dataset_fingerprint, movie_service)
+    embeddings = load_cached_embeddings(embedding_metadata["fingerprint"], movie_service, MODEL_NAME, EMBEDDINGS_PATH)
 
     if len(embeddings) != movie_count:
         raise ValueError(
@@ -105,10 +92,10 @@ with st.sidebar:
 tab_search, tab_metrics, tab_graph, tab_dataset = st.tabs(["🔎 Movie Search", "📊 Search Metrics", "🕸️ Knowledge Graph", "📚 Dataset"])
 
 with tab_search:
-    render_search_page(movie_service, embeddings, model, top_k, dataset_fingerprint)
+    render_search_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
 
 with tab_metrics:
-    render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint)
+    render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
 
 with tab_graph:
     render_graph_page(movie_service, dataset_fingerprint)

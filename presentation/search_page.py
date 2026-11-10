@@ -16,7 +16,7 @@ def render_matches(results):
         st.divider()
 
 @st.fragment
-def render_semantic_search(movie_service: MovieService, embeddings, model, top_k: int, dataset_fingerprint: str):
+def render_semantic_search(movie_service: MovieService, embeddings, model, top_k: int, dataset_fingerprint: str, tfidf_index):
     st.subheader("Find a movie")
 
     with st.form("semantic_search_form"):
@@ -33,7 +33,7 @@ def render_semantic_search(movie_service: MovieService, embeddings, model, top_k
                     if method != "TF-IDF (Baseline)":
                         results["SBERT"] = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
                     if method != "SBERT (Semantic)":
-                        results["TF-IDF"] = get_cached_tfidf_search(query.strip(), top_k, dataset_fingerprint, movie_service)
+                        results["TF-IDF"] = get_cached_tfidf_search(query.strip(), top_k, dataset_fingerprint, movie_service, tfidf_index)
             except ValueError as exc:
                 st.error(f"Could not run search: {exc}")
                 return
@@ -117,7 +117,7 @@ def render_catalog_browser(movie_service: MovieService, embeddings, top_k: int, 
                 )
 
 
-def render_search_page(movie_service, embeddings, model, top_k: int, dataset_fingerprint: str):
-    render_semantic_search(movie_service, embeddings, model, top_k, dataset_fingerprint)
+def render_search_page(movie_service, embeddings, model, top_k: int, dataset_fingerprint: str, tfidf_index):
+    render_semantic_search(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
     with st.expander("Browse the catalog and find similar movies"):
         render_catalog_browser(movie_service, embeddings, top_k, dataset_fingerprint)
