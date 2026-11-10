@@ -78,9 +78,9 @@ except Exception as exc:
     st.error(f"Could not load movie embeddings: {exc}")
     st.stop()
 
-st.set_page_config(page_title="CineNexus", page_icon="🎬", layout="wide")
+st.set_page_config(page_title="CineNexus", page_icon=":material/movie:", layout="wide")
 
-st.title("🎬 CineNexus")
+st.title(":material/movie: CineNexus")
 st.caption("Explore movies through semantic similarity and connected entities.")
 
 with st.sidebar:
@@ -89,7 +89,7 @@ with st.sidebar:
     st.write("**Embedding model:** `all-MiniLM-L6-v2`")
     top_k = st.slider("Similar movies to show", min_value=3, max_value=10, value=5)
 
-tab_search, tab_metrics, tab_graph, tab_dataset = st.tabs(["🔎 Movie Search", "📊 Search Metrics", "🕸️ Knowledge Graph", "📚 Dataset"])
+tab_search, tab_metrics, tab_graph, tab_dataset = st.tabs([":material/search: Movie Search", ":material/analytics: Search Metrics", ":material/account_tree: Knowledge Graph", ":material/database: Dataset"])
 
 with tab_search:
     render_search_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
