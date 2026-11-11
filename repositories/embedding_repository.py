@@ -1,3 +1,4 @@
+from collections.abc import Iterable
 from pathlib import Path
 import hashlib
 
@@ -10,7 +11,8 @@ class EmbeddingRepository:
         self.file_path = file_path
 
     @staticmethod
-    def create_fingerprint(texts, model_name):
+    def create_fingerprint(texts: Iterable[object], model_name: str) -> str:
+        """Hash texts in one pass, preserving the existing byte format and order."""
         hasher = hashlib.sha256()
 
         hasher.update(model_name.encode("utf-8"))

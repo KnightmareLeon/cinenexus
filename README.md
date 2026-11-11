@@ -186,6 +186,8 @@ During this process, CineNexus:
 
 The resulting SQLite database contains the processed movie records and their associated relationships.
 
+Fingerprint computation processes search texts incrementally, without building an additional corpus list. The importer iterates the search-text column directly; database validation streams SQLite records in embedding-index order. The SHA-256 format is unchanged, so existing fingerprints and embedding files remain compatible. This reduces memory use during fingerprinting; CSV processing and embedding generation still have separate memory requirements.
+
 ### 5. Embedding Generation and Caching
 
 CineNexus uses the pretrained Sentence-BERT model `sentence-transformers/all-MiniLM-L6-v2` to generate 384-dimensional embeddings for movie search and recommendations.

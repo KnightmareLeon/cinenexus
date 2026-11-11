@@ -55,9 +55,9 @@ def import_dataset():
     database = DatabaseRepository(DATABASE_PATH)
     database.initialize()
 
-    search_texts = dataframe["search_text"].tolist()
-
-    embedding_fingerprint = EmbeddingRepository.create_fingerprint(search_texts, MODEL_NAME)
+    embedding_fingerprint = EmbeddingRepository.create_fingerprint(
+        dataframe["search_text"], MODEL_NAME
+    )
     connection = database.connect()
 
     try:
