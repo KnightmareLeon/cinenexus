@@ -4,7 +4,8 @@ import pandas as pd
 import streamlit as st
 
 from services.movie_service import MovieService
-from services.query_cache import get_cached_movies_page
+from services.dataset_export_service import DATASET_COLUMNS, movie_to_dataset_row, movies_to_csv
+from services.query_cache import get_cached_catalog_csv, get_cached_movies_page
 
 def previous_page():
     st.session_state.dataset_page_number -= 1
@@ -47,19 +48,42 @@ def render_dataset_page(movie_service: MovieService, dataset_fingerprint: str):
         f"of {total_records:,} movies"
     )
 
-    dataframe = pd.DataFrame([
-        {
-            "Title": movie.title,
-            "Year": movie.year,
-            "Genres": ", ".join(movie.genres),
-            "Director": movie.director or "Unknown",
-            "Actors": ", ".join(movie.actors),
-            "Overview": movie.overview,
-        }
-        for movie in movies
-    ])
+    dataframe = pd.DataFrame(
+        [movie_to_dataset_row(movie) for movie in movies], columns=DATASET_COLUMNS
+    )
 
     st.dataframe(dataframe, width="stretch", hide_index=True)
+
+    st.download_button(
+        "Download current page (CSV)",
+        icon=":material/download:",
+        data=movies_to_csv(movies),
+        file_name=f"cinenexus-movies-page-{current_page}.csv",
+        mime="text/csv",
+        key=f"dataset_page_csv_{dataset_fingerprint}_{current_page}",
+    )
+
+    st.caption(
+        f"The full catalog export includes all {total_records:,} movies. "
+        "Preparing a large catalog may take some time."
+    )
+    catalog_csv = None
+    if st.button("Prepare full catalog CSV", key="dataset_prepare_csv"):
+        # Store only the dataset identity; the export bytes live in the shared cache.
+        catalog_csv = get_cached_catalog_csv(movie_service, dataset_fingerprint)
+        st.session_state.dataset_export_fingerprint = dataset_fingerprint
+
+    if st.session_state.get("dataset_export_fingerprint") == dataset_fingerprint:
+        if catalog_csv is None:
+            catalog_csv = get_cached_catalog_csv(movie_service, dataset_fingerprint)
+        st.download_button(
+            "Download full catalog (CSV)",
+            icon=":material/download:",
+            data=catalog_csv,
+            file_name="cinenexus-movies.csv",
+            mime="text/csv",
+            key=f"dataset_catalog_csv_{dataset_fingerprint}",
+        )
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
