@@ -22,9 +22,9 @@ def get_movie_embeddings_from_database(movie_service, model, model_name, reposit
     if embeddings is not None:
         return embeddings
 
-    texts = movie_service.get_search_texts()
-
-    actual_fingerprint = repository.create_fingerprint(texts, model_name)
+    actual_fingerprint = repository.create_fingerprint(
+        movie_service.iter_search_texts(), model_name
+    )
 
     if actual_fingerprint != expected_fingerprint:
         raise ValueError(
@@ -32,6 +32,7 @@ def get_movie_embeddings_from_database(movie_service, model, model_name, reposit
             "the current movie dataset. Please re-import the dataset."
         )
 
+    texts = movie_service.get_search_texts()
     embeddings = encode_texts(texts, model)
 
     repository.save(embeddings, actual_fingerprint)
