@@ -1,8 +1,15 @@
+import csv
+import random
+import re
+import unicodedata
+
 from time import perf_counter
 from dataclasses import dataclass
 
 from services.recommendation_service import search_movies, search_movies_tfidf
 
+from datetime import datetime
+from pathlib import Path
 
 def compare_searches(query, top_k, movie_service, embeddings, model, tfidf_index):
     """Measure uncached query execution, excluding model/index preparation."""
@@ -132,3 +139,197 @@ def run_benchmark(top_k, movie_service, embeddings, model, tfidf_index, cases=TE
                                          "director": getattr(match.movie, "director", None) or "Unknown",
                                          "similarity": match.similarity} for match in matches]})
     return {"metrics": rows, "results": results, "skipped": skipped}
+
+def normalize_movie_title(title):
+    """Normalize titles for case- and punctuation-insensitive matching."""
+    title = unicodedata.normalize("NFKC", str(title)).casefold()
+    title = re.sub(r"[^\w\s]", " ", title)
+    return " ".join(title.split())
+
+
+def normalize_movie_year(year):
+    """Normalize database years such as '2010.0' to '2010'."""
+    if year is None:
+        return ""
+
+    value = str(year).strip()
+
+    if value.endswith(".0"):
+        value = value[:-2]
+
+    return value
+
+def normalize_director_name(name):
+    """Normalize director names for case- and punctuation-insensitive matching."""
+    name = unicodedata.normalize("NFKC", str(name)).casefold()
+    name = re.sub(r"[^\w\s]", " ", name)
+    return " ".join(name.split())
+
+def parse_release_year(date_value):
+    """Extract a year from the IMDb dataset's release date."""
+    if not date_value:
+        return None
+
+    date_value = str(date_value).strip()
+
+    formats = (
+        "%m/%d/%Y",
+        "%Y-%m-%d",
+        "%Y",
+    )
+
+    for date_format in formats:
+        try:
+            return str(datetime.strptime(date_value, date_format).year)
+        except ValueError:
+            continue
+
+    return None
+
+def generate_imdb_test_cases(imdb_csv_path, movie_service, output_path="imdb_test_cases.csv", skipped_path="imdb_skipped_cases.csv", sample_size=500, random_state=42,):
+    """
+    Generate external evaluation cases from the IMDb CSV.
+
+    Movies are matched using normalized title and release year.
+    Ambiguous and unmatched records are excluded.
+    """
+
+    if sample_size < 1:
+        raise ValueError("Sample size must be positive.")
+
+    imdb_csv_path = Path(imdb_csv_path)
+    output_path = Path(output_path)
+    skipped_path = Path(skipped_path)
+
+    matched_cases = []
+    skipped = []
+
+    seen_source_keys = set()
+    title_search_cache = {}
+
+    total_records = 0
+    duplicate_source_records = 0
+
+    with imdb_csv_path.open("r", encoding="utf-8-sig", newline="",) as file:
+
+        reader = csv.DictReader(file)
+
+        required_columns = {"names", "date_x", "overview"}
+
+        if not required_columns.issubset(reader.fieldnames or []):
+            raise ValueError(f"IMDb CSV must contain these columns: {required_columns}")
+
+        for row in reader:
+            total_records += 1
+
+            title = (row.get("names") or "").strip()
+            overview = (row.get("overview") or "").strip()
+            year = parse_release_year(row.get("date_x"))
+
+            if not title:
+                skipped.append({"title": "", "year": year or "", "reason": "Missing title",})
+                continue
+
+            if not overview:
+                skipped.append({"title": title, "year": year or "", "reason": "Missing overview",})
+                continue
+
+            if not year:
+                skipped.append({"title": title, "year": "", "reason": "Invalid or missing release date",})
+                continue
+
+            normalized_title = normalize_movie_title(title)
+            source_key = (normalized_title, year)
+
+            if source_key in seen_source_keys:
+                duplicate_source_records += 1
+                continue
+
+            seen_source_keys.add(source_key)
+
+            if normalized_title not in title_search_cache:
+                title_search_cache[normalized_title] = (movie_service.search_movies_by_title(query=title, limit=100,))
+
+            candidates = title_search_cache[normalized_title]
+
+            matches = [
+                movie
+                for movie in candidates
+                if (
+                    normalize_movie_title(movie.title) == normalized_title
+                    and normalize_movie_year(movie.year) == year
+                )
+            ]
+
+            if not matches:
+                skipped.append({"title": title, "year": year, "reason": "No matching CineNexus movie",})
+                continue
+
+            if len(matches) > 1:
+                skipped.append({"title": title, "year": year, "reason": "Multiple matching CineNexus movies",})
+                continue
+
+            movie = matches[0]
+
+            matched_cases.append(SearchTestCase(query=overview, movie_id=str(movie.id), title=str(movie.title), year=year,))
+
+    rng = random.Random(random_state)
+
+    selected_cases = rng.sample(matched_cases, k=min(sample_size, len(matched_cases)))
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with output_path.open("w", encoding="utf-8", newline="",) as file:
+
+        writer = csv.DictWriter(file, fieldnames=["query", "movie_id", "title", "year"],)
+
+        writer.writeheader()
+
+        for case in selected_cases:
+            writer.writerow({"query": case.query, "movie_id": case.movie_id, "title": case.title, "year": case.year,})
+
+    skipped_path.parent.mkdir(parents=True, exist_ok=True)
+
+    with skipped_path.open("w", encoding="utf-8", newline="",) as file:
+
+        writer = csv.DictWriter(file, fieldnames=["title", "year", "reason"],)
+
+        writer.writeheader()
+        writer.writerows(skipped)
+
+    return {
+        "total_records": total_records,
+        "matched_records": len(matched_cases),
+        "selected_records": len(selected_cases),
+        "skipped_records": len(skipped),
+        "duplicate_source_records": duplicate_source_records,
+        "test_cases": selected_cases,
+        "output_path": str(output_path),
+        "skipped_path": str(skipped_path),
+    }
+
+
+def load_imdb_test_cases(csv_path):
+    """Load generated IMDb test cases into SearchTestCase objects."""
+
+    cases = []
+
+    with Path(csv_path).open(
+        "r",
+        encoding="utf-8-sig",
+        newline="",
+    ) as file:
+
+        reader = csv.DictReader(file)
+
+        for row in reader:
+            cases.append(
+                SearchTestCase(
+                    query=row["query"],
+                    movie_id=row["movie_id"],
+                    title=row["title"],
+                    year=row["year"],
+                )
+            )
+
+    return tuple(cases)
