@@ -21,7 +21,6 @@ def render_semantic_search(movie_service: MovieService, embeddings, model, top_k
 
     with st.form("semantic_search_form"):
         query = st.text_input("Search by title or describe what you want to watch", placeholder="e.g., a space adventure about family")
-        method = st.radio("Search method", ["SBERT (Semantic)", "TF-IDF (Baseline)", "Compare both"], horizontal=True)
 
         submitted = st.form_submit_button("Search")
 
@@ -30,10 +29,8 @@ def render_semantic_search(movie_service: MovieService, embeddings, model, top_k
             results = {}
             try:
                 with st.spinner("Searching movies…"):
-                    if method != "TF-IDF (Baseline)":
-                        results["SBERT"] = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
-                    if method != "SBERT (Semantic)":
-                        results["TF-IDF"] = get_cached_tfidf_search(query.strip(), top_k, dataset_fingerprint, movie_service, tfidf_index)
+                    results["SBERT"] = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
+                    results["TF-IDF"] = get_cached_tfidf_search(query.strip(), top_k, dataset_fingerprint, movie_service, tfidf_index)
             except ValueError as exc:
                 st.error(f"Could not run search: {exc}")
                 return
@@ -43,7 +40,8 @@ def render_semantic_search(movie_service: MovieService, embeddings, model, top_k
             return
 
     saved = st.session_state.get("movie_search_result")
-    if saved and saved[:2] == (dataset_fingerprint, top_k):
+    if (saved and saved[:2] == (dataset_fingerprint, top_k)
+            and set(saved[3]) == {"SBERT", "TF-IDF"}):
         st.caption(f'Results for “{saved[2]}” · up to {top_k} per method. Similarity is not an accuracy score.')
         columns = st.columns(len(saved[3]))
         for column, (name, matches) in zip(columns, saved[3].items()):

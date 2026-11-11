@@ -47,14 +47,9 @@ def evaluate_results(retrieved_ids, expected_ids):
     if not expected:
         raise ValueError("At least one expected movie is required.")
     ranked = list(dict.fromkeys(retrieved_ids))
-    tp = len(set(ranked) & expected)
-    precision = tp / len(ranked) if ranked else 0.0
-    recall = tp / len(expected)
     return {
         "Accuracy@1": float(bool(ranked) and ranked[0] in expected),
-        "Precision@k": precision,
-        "Recall@k": recall,
-        "F1@k": 2 * precision * recall / (precision + recall) if precision + recall else 0.0,
+        "Hit@5": float(bool(set(ranked[:5]) & expected)),
     }
 
 
