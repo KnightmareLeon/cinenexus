@@ -95,7 +95,7 @@ with tab_search:
     render_search_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
 
 with tab_metrics:
-    render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
+    render_metrics_page(movie_service, embeddings, model, dataset_fingerprint, tfidf_index)
 
 with tab_graph:
     render_graph_page(movie_service, dataset_fingerprint)

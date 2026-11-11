@@ -6,34 +6,29 @@ import streamlit as st
 
 from services.evaluation_service import TEST_QUERIES, run_benchmark
 
-SCORE_COLUMNS = ["Accuracy@1", "Precision@k", "Recall@k", "F1@k", "Time (ms)"]
+SCORE_COLUMNS = ["Accuracy@1", "Hit@5", "Time (ms)"]
 
-def _show_scores(frame):
+def _show_scores(frame, hide_index=False):
     st.dataframe(frame.style.format({
         **{column: "{:.1%}" for column in SCORE_COLUMNS[:-1]},
         "Time (ms)": "{:.1f}",
-    }), width="stretch")
+    }), width="stretch", hide_index=hide_index)
 
 
 def _comparison_frame(scores):
     """Show the expected film's status beside the method's first prediction."""
     frame = scores.copy()
     frame["Expected movie"] = frame["Expected movie"] + " · " + frame["Expected director"]
-    frame["Expected film status"] = [
-        f"{movie}: found at rank {rank}" if str(rank).isdigit() else f"{movie}: {rank.lower()}"
-        for movie, rank in zip(frame["Expected movie"], frame["Target rank"])
-    ]
-    frame["Predicted film (rank 1)"] = [
+    frame["Predicted movie (rank 1)"] = [
         "No results" if movie == "No results" else f"{movie} · {director}"
         for movie, director in zip(frame["First result"], frame["First result director"])
     ]
-    return frame.set_index(["Query", "Method"])[
-        ["Expected film status", "Predicted film (rank 1)", *SCORE_COLUMNS]
-    ]
+    return frame[["Query", "Expected movie", "Predicted movie (rank 1)", "Method", *SCORE_COLUMNS]]
 
 
 @st.fragment
-def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index):
+def render_metrics_page(movie_service, embeddings, model, dataset_fingerprint, tfidf_index):
+    top_k = 5
     test_cases = [asdict(case) for case in TEST_QUERIES]
     st.subheader("Search metrics: SBERT vs TF-IDF")
     st.write("Compare both methods on preset test queries with saved target movies. No manual labeling needed.")
@@ -59,16 +54,16 @@ def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerp
             "test_cases": test_cases,
             "scope": "Fixed known-movie lookup tests; each query has one expected movie. Not general relevance evaluation.",
             "accuracy_definition": "Fraction of test queries whose first result is the expected movie.",
-            "f1_definition": "Per-query F1 of returned movies against the saved target; summary is the unweighted query mean.",
+            "hit_definition": "Fraction of test queries whose expected movie appears in the first five results.",
             "timing_definition": "One uncached search per query and method; excludes model loading, index construction and scoring.",
         }
 
     run = st.session_state.get("metrics_benchmark")
     if not run:
-        st.info("Run the test queries to see accuracy, F1, and search time for each method.")
+        st.info("Run the test queries to see Accuracy@1, Hit@5, and search time for each method.")
         return
     if (run["dataset_fingerprint"] != dataset_fingerprint or run["top_k"] != top_k
-            or "accuracy_definition" not in run or run.get("test_cases") != test_cases):
+            or "hit_definition" not in run or run.get("test_cases") != test_cases):
         st.info("The test queries, dataset, or result count changed. Run the test queries again to refresh the scores.")
         return
     if run["skipped"]:
@@ -85,11 +80,11 @@ def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerp
     _show_scores(summary)
     st.caption(f'{len(scores) // 2} completed queries · unweighted mean across queries · k = {top_k}.')
     if (scores["Accuracy@1"] == 0).all():
-        st.info("None of the expected movies ranked first. Check Expected film status below: an expected movie at rank 2 or later still earns recall and F1 credit. A different movie with the same title does not count as the saved target.")
+        st.info("None of the expected movies ranked first. An expected movie at ranks 2–5 still earns Hit@5 credit. A different movie with the same title does not count as the saved target.")
     st.markdown("**Scores per test query**")
-    _show_scores(_comparison_frame(scores))
-    st.caption('“Expected film status” describes the saved correct answer. “Predicted film (rank 1)” is the method’s actual first result. Open “Inspect returned movies” to see all returned predictions.')
-    st.caption("Accuracy@1: expected movie ranked first (100% or 0% per query). F1@k: precision/recall balance against the saved target. These tests measure finding a specific movie, not general recommendation relevance.")
+    _show_scores(_comparison_frame(scores), hide_index=True)
+    st.caption('“Expected movie” is the saved correct answer. “Predicted movie (rank 1)” is the method’s actual first result. Open “Inspect returned movies” to see all returned predictions.')
+    st.caption("Accuracy@1: expected movie ranked first (100% or 0% per query). Hit@5: expected movie appears in the first five results (100% or 0% per query). These tests measure finding a specific movie, not general recommendation relevance.")
     with st.expander("Inspect returned movies"):
         selected_query = st.selectbox("Test query", scores["Query"].drop_duplicates().tolist())
         for result in run["results"]:
@@ -110,14 +105,10 @@ def render_metrics_page(movie_service, embeddings, model, top_k, dataset_fingerp
                  "Expected target": match["movie_id"] == result["expected_movie_id"]}
                 for rank, match in enumerate(result["matches"], start=1)
             ]), hide_index=True, width="stretch")
-    with st.expander("How to read the metrics"):
-        st.write("Precision is the fraction of returned movies matching the target; recall is 100% if the target is returned, otherwise 0%. Empty results score zero. F1 = 2 × precision × recall / (precision + recall).")
-        st.write(f"Each query has one target. When exactly {top_k} movies are returned, even a successful lookup has F1 = {2 / (top_k + 1):.1%}, because the other results are not that target.")
-        st.write("Times measure one uncached search per query, including query encoding, ranking, and movie retrieval. Model loading and TF-IDF index building are excluded. They are not repeated timing trials.")
     report = {**run, "summary": summary.reset_index().to_dict(orient="records")}
     st.download_button(
         "Download per-query metrics (CSV)",
-        scores.to_csv(index=False).encode("utf-8-sig"),
+        _comparison_frame(scores).to_csv(index=False).encode("utf-8-sig"),
         file_name=f"search-test-metrics-k{top_k}.csv",
         mime="text/csv",
     )

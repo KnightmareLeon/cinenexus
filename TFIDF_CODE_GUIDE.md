@@ -332,11 +332,9 @@ Source: [services/evaluation_service.py](services/evaluation_service.py).
 | Metric | Meaning |
 |---|---|
 | Accuracy@1 | 1 if the first result is an expected movie; otherwise 0 |
-| Precision@k | Expected movies retrieved / number actually returned |
-| Recall@k | Expected movies retrieved / number expected |
-| F1@k | 2 × precision × recall / (precision + recall), or 0 if both are zero |
+| Hit@5 | 1 if an expected movie appears among the first five results; otherwise 0 |
 
-Empty predictions score zero. Duplicate retrieved IDs count once, preserving their first occurrence. An empty expected set is rejected. Each preset has one expected movie, so retrieving it among five results gives precision 20%, recall 100%, and F1 33.3%. The average accuracy is the fraction of test queries whose first result is correct.
+Empty predictions score zero. Duplicate retrieved IDs count once, preserving their first occurrence. An empty expected set is rejected. Scores use saved movie IDs. Average Accuracy@1 measures the fraction of queries answered correctly at rank 1; average Hit@5 measures the fraction finding the target within five results.
 
 ## 14. Run the preset benchmark
 
@@ -348,7 +346,7 @@ Source: [services/evaluation_service.py](services/evaluation_service.py).
 
 Source: [presentation/metrics_page.py](presentation/metrics_page.py).
 
-The **Run test queries** button prepares the TF-IDF index and runs all cases. The page stores the report in session state, shows each method's unweighted average scores, and displays the per-query comparison. Expected movies can be inspected before running the tests. Each scored row states **Expected film status**, naming the expected film and director within the found/not-found message. **Predicted film (rank 1)** shows the actual first result and director immediately beside that status. The complete returned rankings appear under **Inspect returned movies**. An absent expected target does not mean the first result is absent. The presets now use unique exact titles to avoid the same-title ambiguity of the earlier Barbie case. Similar titles and sequels can still outrank a target; uniqueness does not guarantee a successful search. **Inspect returned movies** displays the ranked movie IDs, titles, years, and whether they match the saved target. If every top-1 score is zero, the page explains that targets at later ranks can still receive recall and F1 credit. No relevance editor or manual labeling step is needed. Changing the preset case definitions, dataset fingerprint, or result count hides stale scores until the tests are rerun. The saved report includes the case definitions so an older suite cannot be displayed as the new suite. Recheck title uniqueness after catalog changes.
+The **Run test queries** button runs all cases with five results per method, independently of the sidebar search setting. The page stores the report in session state and shows each method's unweighted average scores. The per-query table and CSV contain **Query**, **Expected movie**, **Predicted movie (rank 1)**, **Method**, **Accuracy@1**, **Hit@5**, and **Time (ms)**. Expected and predicted movies include directors to distinguish same-title records. The complete rankings, movie IDs, and target rank remain available under **Inspect returned movies**. A target at ranks 2–5 earns Hit@5 credit but no Accuracy@1 credit. Changing the preset definitions, dataset fingerprint, or metric definitions hides stale scores until the tests are rerun. The report includes case definitions. Recheck title uniqueness after catalog changes.
 
 Times represent one uncached search per query and method. They exclude model loading, index construction, and scoring. Averaging these times is not a repeated timing experiment.
 

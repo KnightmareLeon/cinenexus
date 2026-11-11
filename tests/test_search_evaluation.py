@@ -56,13 +56,17 @@ class SearchEvaluationTests(unittest.TestCase):
     def test_known_target_scores_and_ranking(self):
         scores = evaluate_results(["a", "b", "c"], ["a"])
         self.assertEqual(scores["Accuracy@1"], 1)
-        self.assertAlmostEqual(scores["Precision@k"], 1 / 3)
-        self.assertEqual(scores["Recall@k"], 1)
-        self.assertEqual(scores["F1@k"], 0.5)
+        self.assertEqual(scores["Hit@5"], 1)
         second = evaluate_results(["b", "a", "c"], ["a"])
         self.assertEqual(second["Accuracy@1"], 0)
-        self.assertEqual(second["F1@k"], 0.5)
+        self.assertEqual(second["Hit@5"], 1)
         self.assertTrue(all(value == 1 for value in evaluate_results(["a", "a"], ["a"]).values()))
+
+    def test_hit_at_five_boundary(self):
+        self.assertEqual(evaluate_results(["b", "c", "d", "e", "a"], ["a"]),
+                         {"Accuracy@1": 0, "Hit@5": 1})
+        self.assertEqual(evaluate_results(["b", "c", "d", "e", "f", "a"], ["a"]),
+                         {"Accuracy@1": 0, "Hit@5": 0})
 
     def test_missing_target_and_empty_predictions_score_zero(self):
         for predictions in ([], ["b", "c"]):
@@ -83,8 +87,8 @@ class SearchEvaluationTests(unittest.TestCase):
                                FakeModel(), TfidfIndex(service.texts), cases)
         self.assertEqual(len(report["metrics"]), 4)
         self.assertEqual(len(report["skipped"]), 2)
-        self.assertEqual(report["metrics"][0]["F1@k"], 2 / 3)
-        self.assertEqual(report["metrics"][1]["F1@k"], 1)
+        self.assertEqual(report["metrics"][0]["Hit@5"], 1)
+        self.assertEqual(report["metrics"][1]["Hit@5"], 1)
         self.assertEqual(report["metrics"][2]["Accuracy@1"], 0)
         self.assertEqual(report["metrics"][3]["Accuracy@1"], 1)
         self.assertEqual(report["metrics"][0]["Target rank"], "1")
@@ -125,7 +129,7 @@ class SearchEvaluationTests(unittest.TestCase):
         for row in expanded["metrics"]:
             self.assertEqual(row["Target rank"], "2")
             self.assertEqual(row["Accuracy@1"], 0)
-            self.assertEqual(row["Recall@k"], 1)
+            self.assertEqual(row["Hit@5"], 1)
 
 
 if __name__ == "__main__":
