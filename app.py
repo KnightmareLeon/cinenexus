@@ -1,5 +1,5 @@
-import streamlit as st
 
+import streamlit as st
 from pathlib import Path
 
 from repositories.sqlite_movie_repository import SQLiteMovieRepository
@@ -11,13 +11,21 @@ from presentation.metrics_page import render_metrics_page
 
 from services.movie_service import MovieService
 from services.query_cache import get_cached_model, load_cached_embeddings, get_tfidf_index
+from services.evaluation_service import generate_imdb_test_cases
 
 from ml.model import MODEL_NAME
+
+st.set_page_config(page_title="CineNexus", page_icon=":material/movie:", layout="wide")
+
 BASE_DIR = Path(__file__).parent
 
 DATA_DIR = BASE_DIR / "data"
 DATABASE_PATH = DATA_DIR / "cinenexus.db"
 EMBEDDINGS_PATH = DATA_DIR / "embeddings.npz"
+
+IMDB_SOURCE_PATH = DATA_DIR / "imdb_movies.csv"
+IMDB_TEST_CASES_PATH = DATA_DIR / "imdb_test_cases.csv"
+IMDB_SKIPPED_PATH = DATA_DIR / "imdb_skipped_cases.csv"
 
 try:
     if not DATABASE_PATH.exists():
@@ -63,6 +71,23 @@ except Exception as exc:
     st.error(f"Could not initialize CineNexus: {exc}")
     st.stop()
 
+
+if IMDB_SOURCE_PATH.exists() and not IMDB_TEST_CASES_PATH.exists():
+    try:
+        with st.spinner("Generating IMDb evaluation test cases..."):
+            result = generate_imdb_test_cases(
+                IMDB_SOURCE_PATH,
+                movie_service,
+                output_path=IMDB_TEST_CASES_PATH,
+                skipped_path=IMDB_SKIPPED_PATH,
+                sample_size=200,
+            )
+
+        st.success(f"Generated {len(result['test_cases'])} IMDb test cases.")
+
+    except Exception as exc:
+        st.warning(f"Could not generate IMDb test cases: {exc}")
+
 try:
     model = get_cached_model()
     tfidf_index = get_tfidf_index(dataset_fingerprint, movie_service)
@@ -77,8 +102,6 @@ try:
 except Exception as exc:
     st.error(f"Could not load movie embeddings: {exc}")
     st.stop()
-
-st.set_page_config(page_title="CineNexus", page_icon=":material/movie:", layout="wide")
 
 st.title(":material/movie: CineNexus")
 st.caption("Explore movies through semantic similarity and connected entities.")
