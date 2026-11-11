@@ -25,14 +25,14 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
             visible.update(node for node in graph.neighbors(neighbor) if graph.nodes[node].get("kind") == "Movie")
 
     visible.discard(focus)
-    visible = {focus, *list(visible)[:max_nodes - 1]}
+    visible = {focus, *sorted(visible)[:max_nodes - 1]}
 
     subgraph = graph.subgraph(visible).copy()
 
     if subgraph.number_of_nodes() == 0:
         return go.Figure()
 
-    pos = nx.spring_layout(subgraph, seed=17, k=0.9, iterations=50)
+    pos = nx.spring_layout(subgraph, seed=17, k=0.9, iterations=20)
 
     edge_x = []
     edge_y = []
