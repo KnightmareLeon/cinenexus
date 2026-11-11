@@ -15,6 +15,11 @@ class RDBMSMovieRepository(ABC):
         pass
 
     @abstractmethod
+    def iter_movies(self, batch_size: int = 500):
+        """Yield catalog movies in display order without loading them all at once."""
+        pass
+
+    @abstractmethod
     def count_movies(self) -> int:
         pass
 

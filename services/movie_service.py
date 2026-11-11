@@ -9,6 +9,9 @@ class MovieService:
     def get_movies_page(self, page=1, page_size=50):
         return self.movie_repository.get_movies_page(page=page, page_size=page_size)
 
+    def iter_movies(self, batch_size=500):
+        return self.movie_repository.iter_movies(batch_size=batch_size)
+
     def get_movie_by_id(self, movie_id):
         return self.movie_repository.get_movie_by_id(movie_id)
 

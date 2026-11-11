@@ -10,7 +10,7 @@ This web application was made to fulfill the partial requirements for the course
 - **Search Metrics** – Run ten preset test queries, using ten unique movie titles, including Inception, Interstellar, and The Shawshank Redemption, against both methods. Compare top-1 accuracy, precision, recall, F1, and search time per query and on average, then download the report as JSON. Expected movie targets are saved in advance; no manual labeling is needed.
 - **Similar Movie Recommendations** – Select a movie to discover other movies with similar descriptions, ranked by cosine similarity.
 - **Movie Knowledge Graph** – Explore connections between movies and their genres, directors, and actors through an interactive graph.
-- **Dataset Explorer** – Browse the loaded movie catalog and download the current dataset as a CSV file.
+- **Dataset Explorer** – Browse the loaded movie catalog and download either the current page or the full catalog as CSV. Choose **Prepare full catalog CSV**, then **Download full catalog (CSV)** to export all movies. Both exports include the displayed title, year, genres, director, actors, and overview columns, with UTF-8 encoding for spreadsheet compatibility. Full exports read SQLite in batches, run only when requested, and are cached for the current dataset; the completed CSV is held in memory for download.
 - **Embedding Caching** – Precomputed movie embeddings are stored locally and reused on subsequent runs, avoiding unnecessary model inference.
 
 ## Technologies Used

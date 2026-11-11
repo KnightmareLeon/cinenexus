@@ -3,6 +3,7 @@ from pathlib import Path
 
 from services.graph_service import build_graph
 from services.movie_service import MovieService
+from services.dataset_export_service import movies_to_csv
 from services.recommendation_service import get_similar_movies, search_movies, search_movies_tfidf
 from services.embedding_service import get_movie_embeddings_from_database
 
@@ -36,6 +37,10 @@ def get_cached_movies_page(_movie_service: MovieService, page: int, page_size: i
 @st.cache_data(show_spinner=False)
 def get_cached_title_search(_movie_service: MovieService, query: str, limit: int, dataset_fingerprint: str,):
     return _movie_service.search_movies_by_title(query=query, limit=limit)
+
+@st.cache_data(show_spinner="Preparing the full movie catalog CSV...", max_entries=1)
+def get_cached_catalog_csv(_movie_service: MovieService, dataset_fingerprint: str) -> bytes:
+    return movies_to_csv(_movie_service.iter_movies())
 
 @st.cache_data(show_spinner=False)
 def get_cached_semantic_search(query: str, top_k: int, dataset_fingerprint: str, _movie_service, _embeddings, _model,):

@@ -154,6 +154,18 @@ class SQLiteMovieRepository(RDBMSMovieRepository):
 
         return self._rows_to_movies(rows)
 
+    def iter_movies(self, batch_size: int = 500):
+        """Stream the catalog and hydrate relationships in batches."""
+        if batch_size < 1:
+            raise ValueError("Batch size must be at least 1.")
+
+        with closing(self._connect()) as connection:
+            cursor = connection.execute(
+                "SELECT * FROM movies ORDER BY normalized_title, id"
+            )
+            while rows := cursor.fetchmany(batch_size):
+                yield from self._rows_to_movies(rows)
+
     def count_movies(self) -> int:
         with closing(self._connect()) as connection:
             return connection.execute("SELECT COUNT(*) FROM movies").fetchone()[0]
