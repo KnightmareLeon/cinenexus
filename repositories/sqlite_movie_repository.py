@@ -195,71 +195,101 @@ class SQLiteMovieRepository(RDBMSMovieRepository):
 
         return self._rows_to_movies(rows)
 
-    def get_related_movies(self, movie_id: str, limit: int = 5) -> list[Movie]:
-        if limit < 1:
-            return []
-
-        movie_id = str(movie_id)
-
+    def get_related_movies(self, movie_id: str, limit: int = 20):
         query = """
-            WITH focus_entities AS (
-                SELECT 'genre' AS entity_type, genre AS entity_value
-                FROM movie_genres
-                WHERE movie_id = ?
-
-                UNION ALL
-
-                SELECT 'director', director_name
-                FROM movie_directors
-                WHERE movie_id = ?
-
-                UNION ALL
-
-                SELECT 'actor', actor_name
+            WITH focus_actors AS (
+                SELECT actor_name
                 FROM movie_actors
                 WHERE movie_id = ?
             ),
-
+            focus_directors AS (
+                SELECT director_name
+                FROM movie_directors
+                WHERE movie_id = ?
+            ),
+            focus_genres AS (
+                SELECT genre
+                FROM movie_genres
+                WHERE movie_id = ?
+            ),
             candidate_matches AS (
-                SELECT candidate.movie_id, COUNT(*) AS shared_count
-                FROM (
-                    SELECT movie_id, 'genre' AS entity_type,
-                        genre AS entity_value
-                    FROM movie_genres
-
-                    UNION ALL
-
-                    SELECT movie_id, 'director', director_name
-                    FROM movie_directors
-
-                    UNION ALL
-
-                    SELECT movie_id, 'actor', actor_name
-                    FROM movie_actors
-                ) AS candidate
-
-                INNER JOIN focus_entities AS focus
-                    ON candidate.entity_type = focus.entity_type
-                    AND candidate.entity_value = focus.entity_value
-
+                -- Shared actors
+                SELECT
+                    candidate.movie_id,
+                    COUNT(*) AS shared_count
+                FROM focus_actors AS focus
+                JOIN movie_actors AS candidate
+                    INDEXED BY idx_actors_name
+                    ON candidate.actor_name = focus.actor_name
                 WHERE candidate.movie_id != ?
-
                 GROUP BY candidate.movie_id
-            )
 
-            SELECT candidate_matches.movie_id
-            FROM candidate_matches
-            ORDER BY candidate_matches.shared_count DESC,
-                    candidate_matches.movie_id
+                UNION ALL
+
+                -- Shared directors
+                SELECT
+                    candidate.movie_id,
+                    COUNT(*) AS shared_count
+                FROM focus_directors AS focus
+                JOIN movie_directors AS candidate
+                    INDEXED BY idx_directors_name
+                    ON candidate.director_name = focus.director_name
+                WHERE candidate.movie_id != ?
+                GROUP BY candidate.movie_id
+
+                UNION ALL
+
+                -- Shared genres
+                SELECT
+                    candidate.movie_id,
+                    COUNT(*) AS shared_count
+                FROM focus_genres AS focus
+                JOIN movie_genres AS candidate
+                    INDEXED BY idx_genres_name
+                    ON candidate.genre = focus.genre
+                WHERE candidate.movie_id != ?
+                GROUP BY candidate.movie_id
+            ),
+            ranked_movies AS (
+                SELECT
+                    movie_id,
+                    SUM(shared_count) AS total_shared
+                FROM candidate_matches
+                GROUP BY movie_id
+            )
+            SELECT movie_id
+            FROM ranked_movies
+            ORDER BY total_shared DESC, movie_id
             LIMIT ?
         """
 
-        with closing(self._connect()) as connection:
-            rows = connection.execute(query, (movie_id, movie_id, movie_id, movie_id, limit,),).fetchall()
+        with self._connect() as connection:
+            rows = connection.execute(
+                query,
+                (
+                    movie_id,
+                    movie_id,
+                    movie_id,
+                    movie_id,
+                    movie_id,
+                    movie_id,
+                    limit,
+                ),
+            ).fetchall()
 
-        related_ids = [row["movie_id"] for row in rows]
+        movie_ids = [row["movie_id"] for row in rows]
 
-        return self.get_movies_by_ids(related_ids)
+        if not movie_ids:
+            return []
+
+        movies = self.get_movies_by_ids(movie_ids)
+        movies_by_id = {movie.id: movie for movie in movies}
+
+        return [
+            movies_by_id[related_id]
+            for related_id in movie_ids
+            if related_id in movies_by_id
+        ]
 
     def get_movie_embedding_index(self, movie_id: str) -> int | None:
         with closing(self._connect()) as connection:
