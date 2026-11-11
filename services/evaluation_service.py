@@ -40,6 +40,50 @@ TEST_QUERIES = (
     SearchTestCase("The Curious Case of Benjamin Button", "1000424", "The Curious Case of Benjamin Button", "2008"),
 )
 
+## plot-test queries 
+PLOT_TEST_QUERIES = (
+    SearchTestCase(
+        "A thief enters people's dreams to plant an idea.",
+        "1000018", "Inception", "2010",
+    ),
+    SearchTestCase(
+        "A dream infiltration mission becomes a dangerous heist.",
+        "1000018", "Inception", "2010",
+    ),
+    SearchTestCase(
+        "Explorers travel through a wormhole to find humanity a new home.",
+        "1000007", "Interstellar", "2014",
+    ),
+    SearchTestCase(
+        "Space travelers search for a habitable planet as Earth becomes unlivable.",
+        "1000007", "Interstellar", "2014",
+    ),
+    SearchTestCase(
+        "A man discovers that his entire life is a television show.",
+        "1000022", "The Truman Show", "1998",
+    ),
+    SearchTestCase(
+        "Someone gradually realizes his ordinary world has been staged.",
+        "1000022", "The Truman Show", "1998",
+    ),
+    SearchTestCase(
+        "A couple undergoes a procedure to erase memories of their relationship.",
+        "1000029", "Eternal Sunshine of the Spotless Mind", "2004",
+    ),
+    SearchTestCase(
+        "Former lovers try to forget each other through memory removal.",
+        "1000029", "Eternal Sunshine of the Spotless Mind", "2004",
+    ),
+    SearchTestCase(
+        "A man is born elderly and grows younger over time.",
+        "1000424", "The Curious Case of Benjamin Button", "2008",
+    ),
+    SearchTestCase(
+        "A person's life unfolds with aging running in reverse.",
+        "1000424", "The Curious Case of Benjamin Button", "2008",
+    ),
+)
+
 
 def evaluate_results(retrieved_ids, expected_ids):
     """Score known-target retrieval; accuracy is top-1 correctness, not catalog TNs."""
