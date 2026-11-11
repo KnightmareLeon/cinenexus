@@ -1,64 +1,140 @@
-
 import streamlit as st
 
 from services.movie_service import MovieService
-from services.query_cache import (get_cached_semantic_search, get_cached_title_search, get_cached_similar_movies, get_cached_tfidf_search)
+from services.query_cache import (
+    get_cached_semantic_search,
+    get_cached_title_search,
+    get_cached_similar_movies,
+    get_cached_tfidf_search,
+)
+
+
+def _format_year(year_val) -> str:
+    """Strips trailing .0 from float-formatted years and handles missing values."""
+    if not year_val:
+        return "N/A"
+    s = str(year_val).strip()
+    if s.endswith(".0"):
+        s = s[:-2]
+    return s if s else "N/A"
 
 
 def render_matches(results):
     if not results:
-        st.info("No matching movies found. Try different words for TF-IDF.")
+        st.caption("No matching movies found.")
+        return
+
     for rank, match in enumerate(results, 1):
         movie = match.movie
-        st.markdown(f"**{rank}. {movie.title} ({movie.year})** · similarity `{match.similarity:.3f}`")
-        st.caption(f"Director: {getattr(movie, 'director', None) or 'Unknown'}")
-        st.caption(movie.overview or "No description available.")
-        st.divider()
+        year_str = _format_year(movie.year)
+        director_str = getattr(movie, "director", None) or "Unknown"
+        genres_list = getattr(movie, "genres", None) or []
+        genres_str = ", ".join(genres_list[:3])
+
+        meta_parts = [f"Director: {director_str}"]
+        if genres_str:
+            meta_parts.append(genres_str)
+
+        with st.container(border=True):
+            col_title, col_score = st.columns([4, 1])
+            with col_title:
+                st.markdown(f"**{rank}. {movie.title}** ({year_str})")
+            with col_score:
+                st.markdown(f"`{match.similarity:.3f}`")
+
+            st.caption(" | ".join(meta_parts))
+            st.write(movie.overview or "No description available.")
+
 
 @st.fragment
-def render_semantic_search(movie_service: MovieService, embeddings, model, top_k: int, dataset_fingerprint: str, tfidf_index):
+def render_semantic_search(
+    movie_service: MovieService,
+    embeddings,
+    model,
+    top_k: int,
+    dataset_fingerprint: str,
+    tfidf_index,
+):
     st.subheader("Find a movie")
 
     with st.form("semantic_search_form"):
-        query = st.text_input("Search by title or describe what you want to watch", placeholder="e.g., a space adventure about family")
-
+        query = st.text_input(
+            "Search by title or describe a plot premise",
+            placeholder="e.g., an innocent banker is framed for murder and sent to prison",
+        )
         submitted = st.form_submit_button("Search")
 
     if submitted:
         if query.strip():
             results = {}
             try:
-                with st.spinner("Searching movies…"):
-                    results["SBERT"] = get_cached_semantic_search(query.strip(), top_k, dataset_fingerprint, movie_service, embeddings, model)
-                    results["TF-IDF"] = get_cached_tfidf_search(query.strip(), top_k, dataset_fingerprint, movie_service, tfidf_index)
+                with st.spinner("Searching catalog..."):
+                    results["SBERT"] = get_cached_semantic_search(
+                        query.strip(),
+                        top_k,
+                        dataset_fingerprint,
+                        movie_service,
+                        embeddings,
+                        model,
+                    )
+                    results["TF-IDF"] = get_cached_tfidf_search(
+                        query.strip(),
+                        top_k,
+                        dataset_fingerprint,
+                        movie_service,
+                        tfidf_index,
+                    )
             except ValueError as exc:
                 st.error(f"Could not run search: {exc}")
                 return
-            st.session_state.movie_search_result = (dataset_fingerprint, top_k, query.strip(), results)
+            st.session_state.movie_search_result = (
+                dataset_fingerprint,
+                top_k,
+                query.strip(),
+                results,
+            )
         else:
             st.info("Please enter a search query.")
             return
 
     saved = st.session_state.get("movie_search_result")
-    if (saved and saved[:2] == (dataset_fingerprint, top_k)
-            and set(saved[3]) == {"SBERT", "TF-IDF"}):
-        st.caption(f'Results for “{saved[2]}” · up to {top_k} per method. Similarity is not an accuracy score.')
-        columns = st.columns(len(saved[3]))
-        for column, (name, matches) in zip(columns, saved[3].items()):
-            with column:
-                st.markdown(f"**{name} matches**")
-                render_matches(matches)
+    if (
+        saved
+        and saved[:2] == (dataset_fingerprint, top_k)
+        and set(saved[3]) == {"SBERT", "TF-IDF"}
+    ):
+        st.caption(
+            f'Showing top {top_k} results per method for "{saved[2]}".'
+        )
+        col_sbert, col_tfidf = st.columns(2)
+        with col_sbert:
+            st.markdown("##### SBERT (Semantic)")
+            render_matches(saved[3]["SBERT"])
+        with col_tfidf:
+            st.markdown("##### TF-IDF (Lexical)")
+            render_matches(saved[3]["TF-IDF"])
     else:
-        st.info("Enter a title or a plot idea, then click Search.")
+        st.caption("Enter a title or plot setup above, then click Search.")
 
 
 @st.fragment
-def render_catalog_browser(movie_service: MovieService, embeddings, top_k: int, dataset_fingerprint: str):
+def render_catalog_browser(
+    movie_service: MovieService,
+    embeddings,
+    top_k: int,
+    dataset_fingerprint: str,
+):
     st.subheader("Browse the catalog")
 
-    title_query = st.text_input("Find a movie by title", placeholder="Start typing a movie title...", key="search_movie_search")
+    title_query = st.text_input(
+        "Find a movie by title",
+        placeholder="Start typing a movie title...",
+        key="search_movie_search",
+    )
 
-    matching_movies = get_cached_title_search(movie_service, title_query.strip(), 20, dataset_fingerprint)
+    matching_movies = get_cached_title_search(
+        movie_service, title_query.strip(), 20, dataset_fingerprint
+    )
     selected = None
 
     if matching_movies:
@@ -69,9 +145,9 @@ def render_catalog_browser(movie_service: MovieService, embeddings, top_k: int, 
             options=list(movies_by_id.keys()),
             format_func=lambda movie_id: (
                 f"{movies_by_id[movie_id].title} "
-                f"({movies_by_id[movie_id].year})"
+                f"({_format_year(movies_by_id[movie_id].year)})"
             ),
-            key="catalog_movie_selection"
+            key="catalog_movie_selection",
         )
 
         selected = movies_by_id[selected_id]
@@ -79,43 +155,46 @@ def render_catalog_browser(movie_service: MovieService, embeddings, top_k: int, 
     elif title_query.strip():
         st.info("No matching movie titles found.")
     else:
-        st.info("Enter a movie title to browse the catalog.")
+        st.caption("Enter a movie title above to inspect its metadata and similar films.")
 
     if selected is not None:
-        st.markdown(f"### {selected.title} ({selected.year})")
+        with st.container(border=True):
+            st.markdown(f"#### {selected.title} ({_format_year(selected.year)})")
+            st.write(selected.overview or "No description available.")
 
-        st.write(selected.overview)
+            meta_col1, meta_col2 = st.columns(2)
+            with meta_col1:
+                st.caption(f"**Director:** {selected.director or 'Unknown'}")
+                st.caption(f"**Genres:** {', '.join(selected.genres) or 'Unknown'}")
+            with meta_col2:
+                cast_preview = ", ".join(selected.actors[:6]) if selected.actors else "Unknown"
+                st.caption(f"**Cast:** {cast_preview}")
 
-        st.write(
-            f"**Genres:** "
-            f"{', '.join(selected.genres) or 'Unknown'}"
+        results = get_cached_similar_movies(
+            selected.id, top_k, dataset_fingerprint, movie_service, embeddings
         )
 
-        st.write(
-            f"**Director:** "
-            f"{selected.director or 'Unknown'}"
-        )
-
-        st.write(
-            f"**Cast:** "
-            f"{', '.join(selected.actors) or 'Unknown'}"
-        )
-
-        results = get_cached_similar_movies(selected.id, top_k, dataset_fingerprint, movie_service, embeddings)
-
-        st.markdown("**Movies with similar descriptions**")
+        st.markdown("##### Movies with similar descriptions")
 
         if not results:
             st.info("No similar movies found.")
         else:
-            for match in results:
-                st.write(
-                    f"- **{match.movie.title}** "
-                    f"— similarity `{match.similarity:.3f}`"
-                )
+            render_matches(results)
 
 
-def render_search_page(movie_service, embeddings, model, top_k: int, dataset_fingerprint: str, tfidf_index):
-    render_semantic_search(movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index)
+def render_search_page(
+    movie_service,
+    embeddings,
+    model,
+    top_k: int,
+    dataset_fingerprint: str,
+    tfidf_index,
+):
+    render_semantic_search(
+        movie_service, embeddings, model, top_k, dataset_fingerprint, tfidf_index
+    )
+    st.write("")
     with st.expander("Browse the catalog and find similar movies"):
-        render_catalog_browser(movie_service, embeddings, top_k, dataset_fingerprint)
+        render_catalog_browser(
+            movie_service, embeddings, top_k, dataset_fingerprint
+        )
