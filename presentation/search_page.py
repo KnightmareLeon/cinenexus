@@ -30,6 +30,8 @@ def render_matches(results):
         director_str = getattr(movie, "director", None) or "Unknown"
         genres_list = getattr(movie, "genres", None) or []
         genres_str = ", ".join(genres_list[:3])
+        actors_list = getattr(movie, "actors", None) or []
+        actors_str = ", ".join(actors_list[:4])
 
         meta_parts = [f"Director: {director_str}"]
         if genres_str:
@@ -43,6 +45,8 @@ def render_matches(results):
                 st.markdown(f"`{match.similarity:.3f}`")
 
             st.caption(" | ".join(meta_parts))
+            if actors_str:
+                st.caption(f"Cast: {actors_str}")
             st.write(movie.overview or "No description available.")
 
 
@@ -59,8 +63,8 @@ def render_semantic_search(
 
     with st.form("semantic_search_form"):
         query = st.text_input(
-            "Search by title or describe a plot premise",
-            placeholder="e.g., an innocent banker is framed for murder and sent to prison",
+            "Search by title, plot premise, actor, director, or genre",
+            placeholder="e.g., Christopher Nolan sci-fi movie about entering dreams",
         )
         submitted = st.form_submit_button("Search")
 
@@ -108,13 +112,13 @@ def render_semantic_search(
         )
         col_sbert, col_tfidf = st.columns(2)
         with col_sbert:
-            st.markdown("##### SBERT (Semantic)")
+            st.markdown("##### SBERT (Hybrid Semantic)")
             render_matches(saved[3]["SBERT"])
         with col_tfidf:
             st.markdown("##### TF-IDF (Lexical)")
             render_matches(saved[3]["TF-IDF"])
     else:
-        st.caption("Enter a title or plot setup above, then click Search.")
+        st.caption("Enter a title, plot setup, or cast/director query above, then click Search.")
 
 
 @st.fragment
@@ -174,7 +178,7 @@ def render_catalog_browser(
             selected.id, top_k, dataset_fingerprint, movie_service, embeddings
         )
 
-        st.markdown("##### Movies with similar descriptions")
+        st.markdown("##### Movies with similar descriptions & shared metadata")
 
         if not results:
             st.info("No similar movies found.")
