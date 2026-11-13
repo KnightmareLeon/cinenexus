@@ -58,5 +58,5 @@ def get_cached_similar_movies(movie_id: str, top_k: int, dataset_fingerprint: st
     return get_similar_movies(movie_id, _movie_service, _embeddings, top_k)
 
 @st.cache_data(show_spinner="Building knowledge graph for chosen movie...")
-def get_cached_movie_graph(_movie_service: MovieService, movie_id: str, dataset_fingerprint: str):
-    return build_graph(focus_movie_id=movie_id, movie_service=_movie_service)
+def get_cached_movie_graph(_movie_service: MovieService, _embeddings, movie_id: str,  dataset_fingerprint: str, max_related_movies: int = 20):
+    return build_graph(focus_movie_id=movie_id, embeddings=_embeddings, movie_service=_movie_service, max_related_movies = max_related_movies)
