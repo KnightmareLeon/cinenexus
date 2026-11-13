@@ -10,22 +10,49 @@ from services.query_cache import (get_cached_title_search, get_cached_movie_grap
 def get_cached_graph_figure(_graph, focus_movie_id: str, dataset_fingerprint: str):
     return make_graph_figure(_graph, focus_movie_id=focus_movie_id)
 
-def make_graph_figure(graph, focus_movie_id, max_nodes=65):
+def make_graph_figure(graph, focus_movie_id, max_nodes=200):
     focus = f"movie:{focus_movie_id}"
 
     if focus not in graph:
         return go.Figure()
 
     visible = {focus}
+    neighbors = set(graph.neighbors(focus))
 
-    visible.update(graph.neighbors(focus))
+    # Prioritize related movies and important entities
+    priorities = ["Movie", "Director", "Genre", "Actor"]
 
-    for neighbor in list(visible):
-        if graph.nodes[neighbor].get("kind") != "Movie":
-            visible.update(node for node in graph.neighbors(neighbor) if graph.nodes[node].get("kind") == "Movie")
+    for kind in priorities:
+        candidates = sorted(
+            node for node in neighbors
+            if graph.nodes[node].get("kind") == kind
+        )
 
-    visible.discard(focus)
-    visible = {focus, *sorted(visible)[:max_nodes - 1]}
+        remaining = max_nodes - len(visible)
+
+        if remaining <= 0:
+            break
+
+        visible.update(candidates[:remaining])
+
+    # Include movies connected through shared entities
+    entity_nodes = {
+        node for node in visible
+        if graph.nodes[node].get("kind") != "Movie"
+    }
+
+    related_movies = set()
+
+    for entity in entity_nodes:
+        related_movies.update(
+            node for node in graph.neighbors(entity)
+            if graph.nodes[node].get("kind") == "Movie"
+        )
+
+    remaining = max_nodes - len(visible)
+
+    if remaining > 0:
+        visible.update(sorted(related_movies - visible)[:remaining])
 
     subgraph = graph.subgraph(visible).copy()
 
@@ -44,9 +71,20 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
         edge_x.extend([x0, x1, None])
         edge_y.extend([y0, y1, None])
 
-    edge_trace = go.Scatter(x=edge_x, y=edge_y, mode="lines", line=dict(width=1, color="#a8a8a8"), hoverinfo="none", showlegend=False)
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        mode="lines",
+        line=dict(width=1, color="#a8a8a8"),
+        hoverinfo="none",
+        showlegend=False
+    )
 
-    color_map = {"Movie": "#4776b4", "Actor": "#35a16b", "Director": "#d98b32", "Genre": "#9467bd"}
+    color_map = {
+        "Movie": "#4776b4",
+        "Actor": "#35a16b",
+        "Director": "#d98b32",
+        "Genre": "#9467bd"
+    }
 
     node_x = []
     node_y = []
@@ -65,16 +103,32 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
 
         node_text.append(f"{label}<br>Type: {kind}")
 
-        node_colors.append("#e24a4a" if node == focus else color_map.get(kind, "#777777"))
+        node_colors.append(
+            "#e24a4a" if node == focus
+            else color_map.get(kind, "#777777")
+        )
 
-        node_sizes.append(25 if node == focus else 17 if kind == "Movie" else 12)
+        node_sizes.append(
+            25 if node == focus
+            else 17 if kind == "Movie"
+            else 12
+        )
 
-    node_trace = go.Scatter(x=node_x, y=node_y, mode="markers+text",
-        text=[attrs.get("label", node) for node, attrs in subgraph.nodes(data=True)],
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode="markers+text",
+        text=[
+            attrs.get("label", node)
+            for node, attrs in subgraph.nodes(data=True)
+        ],
         textposition="top center",
         hovertext=node_text,
         hoverinfo="text",
-        marker=dict(size=node_sizes, color=node_colors, line=dict(width=1, color="white")),
+        marker=dict(
+            size=node_sizes,
+            color=node_colors,
+            line=dict(width=1, color="white")
+        ),
         showlegend=False
     )
 
@@ -93,7 +147,7 @@ def make_graph_figure(graph, focus_movie_id, max_nodes=65):
     return fig
 
 @st.fragment
-def render_graph_page(movie_service: MovieService, dataset_fingerprint: str):
+def render_graph_page(movie_service: MovieService, embeddings, dataset_fingerprint: str):
     st.subheader("Explore movie connections")
 
     title_query = st.text_input("Find a movie by title", placeholder="Start typing a movie title...", key="graph_movie_search")
@@ -120,7 +174,7 @@ def render_graph_page(movie_service: MovieService, dataset_fingerprint: str):
     )
 
     if selected_id:
-        graph = get_cached_movie_graph(movie_service, selected_id, dataset_fingerprint)
+        graph = get_cached_movie_graph(movie_service, embeddings, selected_id, dataset_fingerprint)
 
         fig = get_cached_graph_figure(graph, selected_id, dataset_fingerprint)
 

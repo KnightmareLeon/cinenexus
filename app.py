@@ -121,7 +121,7 @@ with tab_metrics:
     render_metrics_page(movie_service, embeddings, model, dataset_fingerprint, tfidf_index)
 
 with tab_graph:
-    render_graph_page(movie_service, dataset_fingerprint)
+    render_graph_page(movie_service, embeddings, dataset_fingerprint)
 
 with tab_dataset:
     render_dataset_page(movie_service, dataset_fingerprint)
